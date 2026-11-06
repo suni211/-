@@ -1,0 +1,22 @@
+{
+  "name": "tatsung-marble",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev:server": "node --watch server/index.js",
+    "dev:web": "npm --prefix web run dev",
+    "test": "node --test server/*.test.js",
+    "build": "npm --prefix web run build",
+    "start": "node server/index.js"
+  },
+  "engines": {"node": ">=22"},
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.0",
+    "socket.io": "^4.8.1"
+  }
+}

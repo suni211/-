@@ -1,0 +1,44 @@
+name: Test and deploy to GCE Compute Engine
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency: deploy-gce
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install server dependencies
+        run: npm install --no-audit --no-fund
+      - name: Unit tests
+        run: npm test
+      - name: Build frontend
+        run: npm --prefix web install --no-audit --no-fund && npm run build
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    # Switch on only after the VM exists and all secrets have been configured.
+    if: ${{ vars.GCE_DEPLOY_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare SSH
+        env:
+          SSH_KEY: ${{ secrets.GCE_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.GCE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Deploy Docker Compose on VM
+        env:
+          GCE_HOST: ${{ secrets.GCE_HOST }}
+          GCE_USER: ${{ secrets.GCE_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "$GCE_USER@$GCE_HOST" \
+            'cd /opt/tatsung-marble && git fetch --prune origin main && git checkout main && git reset --hard origin/main && docker compose --env-file .env up -d --build --remove-orphans'

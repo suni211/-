@@ -1,0 +1,55 @@
+name: tatsung-marble
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tatsung_marble}
+      MYSQL_USER: ${MYSQL_USER:-tatsung}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?required}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 8s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tatsung_marble}
+      MYSQL_USER: ${MYSQL_USER:-tatsung}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?required}
+      JWT_SECRET: ${JWT_SECRET:?required}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+    networks: [internal]
+networks:
+  internal: {}
+volumes:
+  mysql_data: {}
+  caddy_data: {}
+  caddy_config: {}
