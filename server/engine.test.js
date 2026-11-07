@@ -42,13 +42,43 @@ test('account wager and in-game money are deliberately separate',()=>{
   assert.equal(MATCH_STAKE,5_000_000);
   assert.equal(START_GOLD,1_000_000);
 });
-test('building restriction opens at three completed laps',()=>{
-  const r=setup();roll(r,'a',()=>0);build(r,'a',2);
-  r.players[0].builtThisLanding=false;
-  r.players[0].laps=3;
-  r.players[0].gold=3_000_000;
-  build(r,'a',2,3);assert.equal(r.tiles[2].level,4);
-  assert.equal(r.players[0].builtThisLanding,true);
+test('three normal buildings maximum and landmark requires a separate upgrade',()=>{
+  const r=setup();roll(r,'a',()=>0);
+  const p=r.players[0],tile=r.tiles[2];
+  p.laps=3;
+  p.gold=3_000_000;
+  build(r,'a',2,3);
+  assert.equal(tile.level,3);
+  assert.equal(tile.ownerId,'a');
+  assert.equal(p.builtThisLanding,true);
+  p.builtThisLanding=false;
+  assert.throws(()=>build(r,'a',2,2),/랜드마크|일반 건물|최대/);
+  build(r,'a',2,1);
+  assert.equal(tile.level,4);
+  assert.throws(()=>build(r,'a',2,1),/건설할 수 없습니다/);
+});
+test('after one lap exactly two normal buildings may be built together',()=>{
+  const r=setup();roll(r,'a',()=>0);
+  const p=r.players[0],tile=r.tiles[2];
+  assert.throws(()=>build(r,'a',2,2),/1바퀴/);
+  p.laps=1;
+  build(r,'a',2,2);
+  assert.equal(tile.level,2);
+  assert.equal(tile.ownerId,'a');
+  p.builtThisLanding=false;
+  assert.throws(()=>build(r,'a',2,2),/일반 건물은 최대 3개/);
+  build(r,'a',2,1);
+  assert.equal(tile.level,3);
+});
+test('landmark cannot be purchased by skipping from one house to fourth level',()=>{
+  const r=setup();roll(r,'a',()=>0);
+  const p=r.players[0],tile=r.tiles[2];
+  build(r,'a',2,1);
+  p.laps=3;p.builtThisLanding=false;
+  assert.throws(()=>build(r,'a',2,3),/일반 건물은 최대 3개/);
+  build(r,'a',2,2);assert.equal(tile.level,3);
+  p.builtThisLanding=false;
+  build(r,'a',2,1);assert.equal(tile.level,4);
 });
 test('guardian chance can be stored and activated later',()=>{
   const r=setup();r.pending={type:'guardian_choice'};r.phase='decide';
