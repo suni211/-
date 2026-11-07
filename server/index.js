@@ -10,7 +10,7 @@ import {randomUUID} from 'node:crypto';
 import {existsSync} from 'node:fs';
 import {join, resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createRoom, joinRoom, leaveRoom, startGame, roll, buy, build, acquire, useHeldCard, resolve as resolveEffect, endTurn, lobbySummary, publicState} from './engine.js';
+import {createRoom, joinRoom, leaveRoom, startGame, roll, buy, build, acquire, acquirePaid, useHeldCard, resolve as resolveEffect, endTurn, lobbySummary, publicState} from './engine.js';
 import {CHARACTERS, ACCOUNT_START_WALLET, MATCH_STAKE} from './data.js';
 
 const PORT=Number(process.env.PORT||3000);
@@ -195,6 +195,7 @@ io.on('connection',socket=>{
     'game:buy':()=>{const room=inRoom();enforceAnimationDone(room);buy(room,u.id);finishDecision(room);},
     'game:build':({tileId,quantity})=>{const room=inRoom();enforceAnimationDone(room);build(room,u.id,tileId,quantity);finishDecision(room);},
     'game:acquire':()=>{const room=inRoom();enforceAnimationDone(room);acquire(room,u.id);finishDecision(room);},
+    'game:acquire:paid':()=>{const room=inRoom();enforceAnimationDone(room);acquirePaid(room,u.id);finishDecision(room);},
     'game:card':({card})=>{const room=inRoom();enforceAnimationDone(room);useHeldCard(room,u.id,card);},
     'game:resolve':(value)=>{const room=inRoom();enforceAnimationDone(room);resolveEffect(room,u.id,value);if(room.pending)room.decisionDeadline=Date.now()+20000;else finishDecision(room);},
     'game:end':()=>{const room=inRoom();enforceAnimationDone(room);endTurn(room,u.id);}
