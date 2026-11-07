@@ -186,14 +186,18 @@ io.on('connection',socket=>{
     }finally{room.starting=false;}
   }));
   const enforceAnimationDone=room=>{if(Date.now()<(room.visualLockUntil||0))throw new Error('주사위와 말이 이동 중입니다.');};
+  // Finish decisions immediately: don't make players wait for the deadline.
+  const finishDecision=room=>{
+    if(room.status==='playing'&&room.phase==='decide'&&!room.pending)endTurn(room,u.id);
+  };
   const actions={
     'game:roll':()=>roll(inRoom(),u.id),
-    'game:buy':()=>{const room=inRoom();enforceAnimationDone(room);buy(room,u.id);},
-    'game:build':({tileId,quantity})=>{const room=inRoom();enforceAnimationDone(room);build(room,u.id,tileId,quantity);},
-    'game:acquire':()=>{const room=inRoom();enforceAnimationDone(room);acquire(room,u.id);},
+    'game:buy':()=>{const room=inRoom();enforceAnimationDone(room);buy(room,u.id);finishDecision(room);},
+    'game:build':({tileId,quantity})=>{const room=inRoom();enforceAnimationDone(room);build(room,u.id,tileId,quantity);finishDecision(room);},
+    'game:acquire':()=>{const room=inRoom();enforceAnimationDone(room);acquire(room,u.id);finishDecision(room);},
     'game:card':({card})=>{const room=inRoom();enforceAnimationDone(room);useHeldCard(room,u.id,card);},
-    'game:resolve':(value)=>{const room=inRoom();enforceAnimationDone(room);resolveEffect(room,u.id,value);if(room.pending)room.decisionDeadline=Date.now()+20000;},
-    'game:end':()=>{throw new Error('턴은 자동 종료됩니다.');}
+    'game:resolve':(value)=>{const room=inRoom();enforceAnimationDone(room);resolveEffect(room,u.id,value);if(room.pending)room.decisionDeadline=Date.now()+20000;else finishDecision(room);},
+    'game:end':()=>{const room=inRoom();enforceAnimationDone(room);endTurn(room,u.id);}
   };
   for(const [event,fn] of Object.entries(actions))socket.on(event,guarded(data=>{fn(data);publish(inRoom());}));
   socket.on('disconnect',()=>{
