@@ -166,8 +166,12 @@ export function build(room,userId,tileId,quantity=1){
   if(p.builtThisLanding)error('이 지역에서는 이미 건설했습니다. 다음 방문을 기다려주세요.');
   const q=Number(quantity);
   if(!Number.isInteger(q)||q<1||q>3)error('건설 수량이 올바르지 않습니다.');
-  if(q===3&&p.laps<3)error('스타트를 3바퀴 돌아야 한 번에 3단계 건설할 수 있습니다.');
-  if(q===2&&p.laps<1)error('스타트를 1바퀴 돌아야 한 번에 2단계 건설할 수 있습니다.');
+  if(q===3&&p.laps<3)error('스타트를 3바퀴 돌아야 한 번에 건물 3개를 지을 수 있습니다.');
+  if(q===2&&p.laps<1)error('스타트를 1바퀴 돌아야 한 번에 건물 2개를 지을 수 있습니다.');
+  // A property holds at most three normal buildings. A landmark is a separate
+  // fourth-level upgrade that requires the existing THREE buildings.
+  if(t.level===3&&q!==1)error('랜드마크는 건물 3개를 완성한 뒤 별도로 건설해야 합니다.');
+  if(t.level<3&&t.level+q>3)error('일반 건물은 최대 3개입니다. 랜드마크는 건물 3개 완성 후 별도로 건설하세요.');
   if(t.level+q>4)error('랜드마크 이상 건설할 수 없습니다.');
   const total=Array.from({length:q},(_,i)=>buildCost(t,t.level+i+1)).reduce((a,b)=>a+b,0);
   if(p.gold<total)error('게임머니가 부족합니다.');
