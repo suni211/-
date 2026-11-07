@@ -60,7 +60,7 @@ async function reserveWagers(room){
   const users=[...room.players].sort((a,b)=>a.userId.localeCompare(b.userId));
   for(const p of users){
    const [rows]=await conn.query('SELECT wallet_g FROM accounts WHERE id=? FOR UPDATE',[p.userId]);
-   if(!rows.length||Number(rows[0].wallet_g)<MATCH_STAKE)throw new Error(`${p.nickname}님의 계정 판돈이 부족합니다. (필요: 5,000,000 G)`);
+   if(!rows.length||Number(rows[0].wallet_g)<MATCH_STAKE)throw new Error(`${p.nickname}님의 계정 판돈이 부족합니다. (필요: ${MATCH_STAKE.toLocaleString()} G)`);
    await conn.query('UPDATE accounts SET wallet_g=wallet_g-? WHERE id=?',[MATCH_STAKE,p.userId]);
    await conn.query('INSERT INTO match_wagers(match_id,user_id,stake) VALUES (?,?,?)',[room.id,p.userId,MATCH_STAKE]);
   }
