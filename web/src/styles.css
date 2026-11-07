@@ -292,3 +292,48 @@
 .marble-turn-end:focus-visible{outline:3px solid #ffe29e}
 @media(max-width:1300px){.classic-cell-name{font-size:16px}.classic-cell-icon{font-size:22px}.classic-cell-number{font-size:12px}}
 @media(max-width:800px){.classic-cell-name{font-size:15px}.classic-cell-icon{font-size:20px}.classic-cell-number{font-size:12px}.marble-classic-stage .marble-board-plaza{padding:5% 8%}.marble-classic-stage .marble-deck{display:none}}
+
+/* ISOMETRIC BUILDINGS + OWNERSHIP + MONEY EVENTS */
+.classic-building{filter:drop-shadow(0 3px 3px #081323aa)}
+.classic-building--level-4{filter:drop-shadow(0 0 6px #ffe69b99) drop-shadow(0 5px 3px #10131ac9)}
+.classic-owner-band{stroke-linejoin:round}
+.classic-cell-owner-id{font-family:system-ui,'Noto Sans KR',sans-serif;font-size:15px;font-weight:1000;fill:#1e2030;paint-order:stroke;stroke:#fffff5;stroke-width:2.6px;pointer-events:none}
+.marble-owner-legend{position:relative;z-index:9;display:flex;flex-wrap:wrap;gap:4px 9px;justify-content:center;align-items:center;max-width:360px;margin:4px 0}
+.marble-owner-legend>span{display:flex;gap:5px;align-items:center;border:1px solid var(--owner-color);background:#1f2634ef;padding:3px 7px;color:#fff;font-size:10px;font-weight:900;border-radius:5px;max-width:165px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.marble-owner-legend b{background:var(--owner-color);color:#202329;padding:2px 5px;border-radius:3px;font-weight:1000}
+.marble-corner-player{border-left:9px solid var(--owner-color,#ffd977);outline:1px solid var(--owner-color,#d9c095)}
+.marble-corner-player.is-active{box-shadow:0 0 0 3px var(--owner-color,#fdd977),0 5px 15px #000a}
+.marble-corner-id{font-size:11px;font-weight:1000;background:var(--owner-color,#ffe177);color:#242636;padding:3px 5px;border-radius:3px}
+.marble-region-details{background:#151e30;border:1px solid #7183a2;padding:12px 15px;border-radius:10px;margin-bottom:12px}
+.marble-region-details p{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #303d56;padding:8px 0;font-size:13px}
+.marble-region-details p:last-child{border:0}
+.marble-region-details p b{font-size:14px}
+.marble-acquire-info{margin-top:12px;padding:14px;background:#192944;border:1px solid #7ba4ca;border-radius:12px}
+.marble-acquire-info h3{font-size:15px;color:#ffdc95}
+.marble-acquire-info p{margin:9px 0;color:#deeaff}
+.marble-acquire-info button{margin-top:9px}
+.marble-money-feed{position:absolute;z-index:31;left:50%;bottom:49px;width:min(450px,calc(100% - 280px));min-width:230px;display:grid;gap:5px;pointer-events:none;transform:translateX(-50%)}
+.marble-money-event{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px 12px;padding:9px 12px;color:#fff;background:#171f2bee;border:1px solid #72839a;border-radius:8px;box-shadow:0 4px 10px #000b;animation:moneyShow .24s ease-out}
+.marble-money-event strong{font-size:12px;color:#e8f4ff}
+.marble-money-event b{font-size:16px;white-space:nowrap;text-shadow:0 1px 2px #0009}
+.marble-money-event.is-minus b{color:#ffa6ac}
+.marble-money-event.is-plus b{color:#a9f0b4}
+.marble-money-event span{font-size:11px;color:#b5d0e4}
+@keyframes moneyShow{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.marble-money-history{max-height:50dvh;overflow-y:auto;display:grid;gap:7px;margin:8px 0 18px}
+.marble-money-history-item{display:grid;grid-template-columns:1fr auto;gap:3px 12px;border:1px solid #4e6180;background:#152137;padding:10px 12px;border-radius:7px}
+.marble-money-history-item b{font-size:13px;color:#fff}
+.marble-money-history-item strong{font-size:13px;white-space:nowrap}
+.marble-money-history-item small{grid-column:1/-1;color:#bfcce3;font-size:11px}
+.marble-money-history-item .is-minus{color:#ffacb7}
+.marble-money-history-item .is-plus{color:#b3f4ba}
+.marble-pawn--traveling{transition:left .06s linear,top .06s linear!important}
+@media(max-width:850px){
+ .marble-money-feed{bottom:47px;left:50%;width:min(310px,calc(100% - 24px))}
+ .marble-money-event{padding:5px 8px}
+ .marble-money-event b{font-size:13px}
+ .marble-corner-player{border-left-width:5px}
+ .marble-owner-legend{max-width:230px;gap:2px 4px}
+ .marble-owner-legend>span{font-size:8px;padding:2px}
+ .classic-cell-owner-id{font-size:12px}
+}
