@@ -114,6 +114,7 @@ function Game({room,user,onCall}){
         tiles={room.tiles} players={room.players} selected={selected??me?.position??0}
         onSelect={setSelected} lastRoll={room.lastRoll} onMotionChange={setMoving}
         onRoll={()=>onCall('game:roll')} rollReady={rollReady} remaining={remaining}
+        onEnd={()=>onCall('game:end')} canEnd={canAct}
         activeName={active?.nickname||''} myTurn={myTurn}
       />
       <div className="marble-classic-players">
@@ -143,7 +144,7 @@ function Game({room,user,onCall}){
             {canTourist&&<button className="marble-dialog-primary" disabled={(me?.gold||0)<landed.price} onClick={()=>onCall('game:buy').then(ok=>{if(ok)setDialog(null)})}>★ 관광지 확보 <strong>{gold(landed.price)}</strong></button>}
             {canAcquire&&<button className="marble-dialog-primary" onClick={()=>onCall('game:acquire').then(ok=>{if(ok)setDialog(null)})}>✨ 무료 인수권 사용</button>}
           </div>
-          <button className="marble-popup-dismiss" onClick={closeDialog}>건너뛰기 · 자동 턴 종료</button>
+          <button className="marble-popup-dismiss" onClick={()=>onCall('game:end').then(ok=>{if(ok){setDismissedLanding(landingKey);setDialog(null);}})}>건너뛰기 · 지금 턴 종료</button>
         </>:
         dialog==='cards'?<><div className="marble-popup-kicker">🎴 INVENTORY</div><h2>보유 아이템</h2><p>🪽 수호천사 {me?.guardian||0}장 · 🔓 탈옥권 {me?.escapeTickets||0}장 · ✨ 무료 인수권 {me?.freeAcquire||0}장</p><button className="marble-dialog-primary" disabled={!myTurn||!(me?.guardian>0)||animationLocked||!!room.pending} onClick={()=>onCall('game:card',{card:'guardian'}).then(ok=>{if(ok)setDialog(null)})}>수호천사 보호막 사용</button><button className="marble-popup-dismiss" onClick={closeDialog}>닫기</button></>:
         dialog==='region'?<><div className="marble-popup-kicker">📍 REGION INFO · #{shown.id}</div><h2>{shown.name}</h2><p>{TYPE_LABEL[shown.type]||shown.type} · {shown.ownerId!=null?'소유 중':'미소유'}</p>{['property','tourist'].includes(shown.type)&&<p>소유자: <b>{owner?.nickname||'없음'}</b> · 단계: <b>{shown.type==='tourist'?'관광지':BUILD_LEVELS[shown.level]}</b></p>}<button className="marble-popup-dismiss" onClick={closeDialog}>확인</button></>:
