@@ -153,7 +153,7 @@ function Game({room,user,onCall}){
             {canBuild&&<><p>{landed.ownerId==null?'첫 건설 시 자동으로 이 지역의 소유자가 됩니다.':`현재 ${BUILD_LEVELS[landed.level]} · 추가 건설 선택`}</p><p>1바퀴 완주: 2단계 · 3바퀴 완주: 3단계 건설 가능</p>{buildAt(1)}{(me?.laps||0)>=1&&landed.level+2<=4&&buildAt(2)}{(me?.laps||0)>=3&&landed.level+3<=4&&buildAt(3)}</>}
             {canTourist&&<button className="marble-dialog-primary" disabled={(me?.gold||0)<landed.price} onClick={()=>onCall('game:buy').then(ok=>{if(ok)setDialog(null)})}>★ 관광지 확보 <strong>{gold(landed.price)}</strong></button>}
             {canPaidAcquire&&<div className="marble-acquire-info">
-              <h3>🏷 ${landedOwner?.nickname||'상대'}님의 지역 인수</h3>
+              <h3>🏷 {landedOwner?.nickname||'상대'}님의 지역 인수</h3>
               <p>도착 통행료 <b>{gold(landingToll(room,landed))}</b> · 현재 {BUILD_LEVELS[landed.level]}</p>
               <p>인수하면 기존 건물과 소유권이 그대로 넘어옵니다. 랜드마크는 인수 불가.</p>
               <button className="marble-dialog-primary" disabled={(me?.gold||0)<takeoverPrice(landed)} onClick={()=>onCall('game:acquire:paid').then(ok=>{if(ok)setDialog(null)})}>💰 유료 인수 <strong>{gold(takeoverPrice(landed))}</strong></button>
