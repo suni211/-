@@ -99,3 +99,5 @@
   100%{transform:translateY(0) rotateX(var(--dice-x)) rotateY(var(--dice-y)) rotateZ(0)}
 }
 @media(max-width:850px){.die-perspective{width:65px;height:65px}.dice-cube{width:56px;height:56px}.dice-face--1{transform:translateZ(28px)}.dice-face--2{transform:rotateY(90deg) translateZ(28px)}.dice-face--3{transform:rotateY(180deg) translateZ(28px)}.dice-face--4{transform:rotateY(-90deg) translateZ(28px)}.dice-face--5{transform:rotateX(90deg) translateZ(28px)}.dice-face--6{transform:rotateX(-90deg) translateZ(28px)}.dice-pip{width:9px;height:9px}}
+
+.hud-last-log{padding:11px 12px;color:#d4def3;font-weight:800;font-size:11px;line-height:1.5;background:#1d2940;border:1px solid #3e5574;border-radius:9px}
