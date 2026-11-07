@@ -15,13 +15,13 @@ const tone=(hex,ratio)=>{
   const n=parseInt(hex.slice(1),16);
   return '#'+[16,8,0].map(shift=>Math.min(255,Math.round(((n>>shift)&255)*ratio)).toString(16).padStart(2,'0')).join('');
 };
-function Building25D({x,y,level,color,variant=0}){
+function Building25D({x,y,level,color,variant=0,scale=1}){
   const height=[0,18,28,39,51][level]||18;
   const width=level>=3?31:level===2?28:25;
   const half=width/2,top=12-height;
   const bright=tone(color,1.15),shadow=tone(color,.56),side=tone(color,.78);
   return <g className={'classic-building classic-building--level-'+level}
-     transform={`translate(${x} ${y})`} pointerEvents="none">
+     transform={`translate(${x} ${y}) scale(${scale})`} pointerEvents="none">
     <ellipse cx="0" cy="17" rx={half+8} ry="8" fill="#131827" opacity=".42"/>
     <polygon points={`${-half},${top} 0,${top-9} ${half},${top} 0,${top+9}`} fill={bright} stroke="#fff4d0" strokeWidth="1.4" strokeLinejoin="round"/>
     <polygon points={`${-half},${top} 0,${top+9} 0,21 ${-half},12`} fill={shadow} stroke="#354052" strokeWidth="1.1"/>
@@ -38,6 +38,18 @@ function Building25D({x,y,level,color,variant=0}){
       <circle cx="0" cy={top-30} r="3.5" fill="#ffe184"/>
     </>}
   </g>;
+}
+// Draw up to three separately visible 2.5D houses. A landmark is the
+// separate fourth upgrade: its completed plot keeps the three small houses.
+function BuildingCluster25D({x,y,level,color,variant}){
+  if(level===4)return <g pointerEvents="none">
+    {[-22,0,22].map((dx,i)=><Building25D key={i} x={x+dx} y={y+16} level={1} color={color} variant={variant+i} scale={.52}/>)}
+    <Building25D x={x} y={y-6} level={4} color={color} variant={variant} scale={.8}/>
+  </g>;
+  const slots=level===1?[0]:level===2?[-14,14]:[-24,0,24];
+  return <g pointerEvents="none">{slots.map((dx,i)=>
+    <Building25D key={i} x={x+dx} y={y+(level===3&&i!==1?6:0)} level={1} color={color} variant={variant+i} scale={level===3?.7:.8}/>
+  )}</g>;
 }
 const linear=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
 const pack=points=>points.map(p=>p.map(n=>n.toFixed(2)).join(',')).join(' ');
@@ -93,7 +105,7 @@ function TileCell({tile,geom,selected,onSelect,players}){
   const full=tile.name.length>8?[tile.name.slice(0,8),tile.name.slice(8,15)+(tile.name.length>15?'…':'')]:[tile.name];
   const angle=`rotate(${geom.angle} ${geom.label[0]} ${geom.label[1]})`;
   const cx=geom.label[0],cy=geom.label[1],tag=geom.ownerTag;
-  const ownerIdLabel=ownerIndex>=0?'P'+(ownerIndex+1):'소유';
+  const ownerIdLabel=ownerIndex>=0?'P'+(ownerIndex+1)+(isProperty?' · '+(tile.level===4?'★':tile.level+'/3'):''):'소유';
   return <g className={`classic-svg-cell ${selected?'is-selected':''} ${owned?'is-owned':''}`}
       role="button" tabIndex={0} aria-label={`${tile.id}번 ${tile.name}${owned?' · '+(owner?.nickname||'소유 중')+' 소유':''}`}
       onClick={()=>onSelect(tile.id)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(tile.id);}}}>
@@ -105,7 +117,7 @@ function TileCell({tile,geom,selected,onSelect,players}){
     <text className="classic-cell-number" x={geom.number[0]} y={geom.number[1]}
        textAnchor="middle" dominantBaseline="middle"
        transform={`rotate(${geom.angle} ${geom.number[0]} ${geom.number[1]})`}>{String(tile.id).padStart(2,'0')}</text>
-    {isProperty&&owned&&tile.level>0&&<Building25D x={geom.building[0]} y={geom.building[1]} level={tile.level} color={ownerColor||'#b6b6b6'} variant={tile.id}/>}
+    {isProperty&&owned&&tile.level>0&&<BuildingCluster25D x={geom.building[0]} y={geom.building[1]} level={tile.level} color={ownerColor||'#b6b6b6'} variant={tile.id}/>}
     {icon&&<text className="classic-cell-icon" x={geom.building[0]} y={geom.building[1]} textAnchor="middle" dominantBaseline="middle">{icon}</text>}
     <text className="classic-cell-name" x={cx} y={cy} transform={angle} textAnchor="middle" dominantBaseline="middle">
       {full.length===1?full[0]:<><tspan x={cx} dy="-8">{full[0]}</tspan><tspan x={cx} dy="18">{full[1]}</tspan></>}
