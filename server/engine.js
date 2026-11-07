@@ -37,9 +37,13 @@ const finish=(room,p,reason) => {
   log(room,`${p.nickname}님 승리! ${reason==='tourist'?'관광지 독점':reason==='triple'?'트리플 독점':reason==='bankruptcy'?'ALL 파산':'턴 종료'} · ${room.winner.multiplier}배`);
 };
 const addGold=(room,p,amount) => {p.gold +=amount; if(p.gold<0){p.gold=0;p.bankrupt=true;room.tiles.forEach(t=>{if(t.ownerId===p.userId){t.ownerId=null;t.level=0;}});log(room,`${p.nickname}님 파산!`);}checkWinner(room);};
-const moveTo=(room,p,position,{passStart=false}={})=>{
-  if(passStart && position<p.position){p.gold+=START_BONUS;log(room,`${p.nickname}님 스타트 통과 +${START_BONUS.toLocaleString()}G`);}
-  if(passStart && position<p.position)p.laps=(p.laps||0)+1;
+const moveTo=(room,p,position,{passStart=false,forceLap=false}={})=>{
+  // A completed circuit is credited immediately, before the landing interaction.
+  if(forceLap||(passStart&&position<p.position)){
+    p.laps=(p.laps||0)+1;
+    p.gold+=START_BONUS;
+    log(room,`${p.nickname}님 ${p.laps}바퀴 완주! 스타트 통과 +${START_BONUS.toLocaleString()}G`);
+  }
   p.position=position;
 };
 const onLanding=(room,p,rand=sample)=>{
@@ -104,7 +108,7 @@ const applyChance=(room,p,id,rand=sample)=>{
 };
 const key = () => Array.from({length:6},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[sample(32)]).join('');
 export function createRoom(owner,{name='새 게임방',isPrivate=false}={}){
-  return {id:key(),name:String(name).slice(0,28)||'새 게임방',isPrivate:!!isPrivate,hostId:owner.id,status:'waiting',phase:'waiting',turnIndex:0,turnCount:0,createdAt:now(),updatedAt:now(),lastRoll:null,lastChance:null,pending:null,winner:null,olympics:null,visualLockUntil:0,decisionDeadline:0,rollDeadline:0,tiles:TILES.map(t=>({...t,ownerId:null,level:0})),logs:[],players:[newPlayer(owner)]};
+  return {id:key(),name:String(name).slice(0,28)||'새 게임방',isPrivate:!!isPrivate,hostId:owner.id,status:'waiting',phase:'waiting',turnIndex:0,turnCount:0,createdAt:now(),updatedAt:now(),lastRoll:null,lastChance:null,pending:null,winner:null,olympics:null,lastTravel:null,visualLockUntil:0,decisionDeadline:0,rollDeadline:0,tiles:TILES.map(t=>({...t,ownerId:null,level:0})),logs:[],players:[newPlayer(owner)]};
 }
 export function newPlayer(user){return {userId:user.id,nickname:user.nickname,username:user.username,character:'tatsung',connected:true,ready:false,position:0,gold:START_GOLD,bankrupt:false,laps:0,builtThisLanding:false,jailTurns:0,escapeTickets:0,guardian:0,guardianActive:0,freeAcquire:0,extraRoll:0};}
 export function joinRoom(room,user){
@@ -120,8 +124,8 @@ export function leaveRoom(room,userId){const i=room.players.findIndex(p=>p.userI
 export function startGame(room,userId){if(room.status!=='waiting'||room.hostId!==userId)error('방장만 게임을 시작할 수 있습니다.');
   if(room.players.length<2||room.players.length>4)error('게임 시작은 2~4명이 필요합니다.');
   if(room.players.some(p=>p.userId!==userId&&!p.ready))error('모든 참가자가 준비해야 합니다.');
-  room.status='playing';room.phase='roll';room.turnIndex=0;room.turnCount=0;room.pending=null;room.rollDeadline=now()+30_000;
-  for(const p of room.players){p.gold=START_GOLD;p.laps=0;p.builtThisLanding=false;p.position=0;}
+  room.status='playing';room.phase='roll';room.turnIndex=0;room.turnCount=0;room.pending=null;room.lastTravel=null;room.rollDeadline=now()+30_000;
+  for(const p of room.players){p.gold=START_GOLD;p.laps=0;p.builtThisLanding=false;p.position=0;p.extraRoll=0;}
   log(room,'게임 시작! 첫 플레이어가 주사위를 굴리세요.');
 }
 export function roll(room,userId,rand=sample){const p=assertTurn(room,userId);assertPhase(room,'roll');room.pending=null;room.lastChance=null;
@@ -155,7 +159,8 @@ export function build(room,userId,tileId,quantity=1){
   if(p.builtThisLanding)error('이 지역에서는 이미 건설했습니다. 다음 방문을 기다려주세요.');
   const q=Number(quantity);
   if(!Number.isInteger(q)||q<1||q>3)error('건설 수량이 올바르지 않습니다.');
-  if(q>1&&(p.laps<3||t.ownerId==null))error('3바퀴를 돌고 이미 소유한 지역에서만 한 번에 여러 건물을 지을 수 있습니다.');
+  if(q===3&&p.laps<3)error('스타트를 3바퀴 돌아야 한 번에 3단계 건설할 수 있습니다.');
+  if(q===2&&p.laps<1)error('스타트를 1바퀴 돌아야 한 번에 2단계 건설할 수 있습니다.');
   if(t.level+q>4)error('랜드마크 이상 건설할 수 없습니다.');
   const total=Array.from({length:q},(_,i)=>buildCost(t,t.level+i+1)).reduce((a,b)=>a+b,0);
   if(p.gold<total)error('게임머니가 부족합니다.');
@@ -186,8 +191,13 @@ export function resolve(room,userId,option={},rand=sample){const p=assertTurn(ro
     case 'airport':{
       const dest=Number(option.tileId);
       if(!pending.options.includes(dest))error('올바른 공항 목적지를 선택하세요.');
-      moveTo(room,p,dest);
-      log(room,`${p.nickname}님 공항 비행 → ${room.tiles[dest].name}`);
+      // Airport route travels forward through START once, then to the selected destination.
+      // One complete lap and +100k are credited immediately on choosing the destination.
+      const from=p.position,steps=room.tiles.length-from+dest,travelAt=now();
+      moveTo(room,p,dest,{forceLap:true});
+      room.lastTravel={kind:'airport',userId:p.userId,from,to:dest,steps,at:travelAt};
+      room.visualLockUntil=Math.max(room.visualLockUntil||0,travelAt+4600);
+      log(room,`${p.nickname}님 공항 비행 · 1바퀴 완주 → ${room.tiles[dest].name}`);
       onLanding(room,p,rand);
       break;
     }
