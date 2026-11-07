@@ -61,6 +61,8 @@ const pawnColor={tatsung:'#ffe177',mint:'#75efc3',berry:'#ff8cac',sky:'#8dbafc'}
 function PlayerFace({character}){return <div className="pawn-face" style={{'--pawn':pawnColor[character]||pawnColor.tatsung}}><span className="pawn-eyes">• •</span><span className="pawn-mouth">◡</span></div>}
 function Game({room,user,onCall}){
   const [selected,setSelected]=useState(null);
+  const [dialog,setDialog]=useState(null);
+  const [dismissedLand,setDismissedLand]=useState('');
   const [moving,setMoving]=useState(false);
   const [clock,setClock]=useState(Date.now());
   useEffect(()=>{const i=setInterval(()=>setClock(Date.now()),250);return ()=>clearInterval(i)},[]);
@@ -79,7 +81,13 @@ function Game({room,user,onCall}){
   const round=Math.min(25,Math.floor((room.turnCount||0)/room.players.length)+1);
   const rollReady=myTurn&&room.phase==='roll'&&!moving;
   const ownedTourists=room.tiles.filter(t=>t.type==='tourist'&&t.ownerId===user.id).length;
-  const showBuild=q=>{const total=buildPrice(landed,q);return <button className="btn btn-buy" disabled={!canBuild||(q>1&&me.laps<3)||landed.level+q>4||me.gold<total} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q})}>🏗 {q}단계 건설<br/>{gold(total)}</button>};
+  const showBuild=q=>{const total=buildPrice(landed,q);return <button className="btn btn-buy" disabled={!canBuild||(q>1&&me.laps<3)||landed.level+q>4||me.gold<total} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q}).then(ok=>{if(ok)setDialog(null)})}>🏗 ${q}단계 건설 · ${gold(total)}</button>};
+  const landingKey=`${room.id}:${room.lastRoll?.at||0}:${me?.position||0}`;
+  useEffect(()=>{
+    if(!myTurn){setDialog(null);return;}
+    if((canBuy||canBuild||canAcquire)&&dismissedLand!==landingKey)setDialog('land');
+    else if(!canBuy&&!canBuild&&!canAcquire)setDialog(d=>d==='land'?null:d);
+  },[myTurn,canBuy,canBuild,canAcquire,dismissedLand,landingKey]);
   return <div className="marble-arena">
     <header className="marble-hud-top">
       <div className="marble-hud-logo">✦ 탓승마블<small>TATSUNG MARBLE</small></div>
@@ -98,7 +106,7 @@ function Game({room,user,onCall}){
           <div className="marble-player-data"><strong>{p.nickname}</strong><small>{p.bankrupt?'💥 파산':active?.userId===p.userId?'🎲 현재 턴':p.connected?'● 접속 중':'○ 재접속 중'} · {p.laps||0}바퀴</small><b>{gold(p.gold)}</b></div>
         </div>)}
         <div className="marble-info-card"><span className="marble-section-title">💎 내 경기 자산</span><strong>{gold(me?.gold||0)}</strong><p>소유 부동산 <b>{room.tiles.filter(t=>t.ownerId===user.id).length}곳</b></p><p>관광지 독점 <b>{ownedTourists} / 4</b></p><p>3바퀴 건설 해제 <b>{(me?.laps||0)>=3?'가능':'아직 '+(3-(me?.laps||0))+'바퀴 남음'}</b></p><p>수호천사 보호막 <b>{me?.guardianActive||0}회</b></p></div>
-        <div className="marble-info-card"><span className="marble-section-title">🏁 승리 배수</span><p>관광지 4곳 독점 <b>×4</b></p><p>트리플 독점 <b>×2</b></p><p>상대 전원 파산 <b>×2.5</b></p><p>라운드 종료 <b>×1</b></p></div>
+
       </aside>
       <main className="marble-board-zone">
         <Board25D tiles={room.tiles} players={room.players} selected={selected??me?.position??0} onSelect={setSelected} lastRoll={room.lastRoll} onMotionChange={setMoving}/>
@@ -108,19 +116,37 @@ function Game({room,user,onCall}){
           {room.status==='finished'?<><div className="hud-alert">🏆 {room.winner?.nickname} 우승 · {room.winner?.reason==='tourist'?'관광지 독점':room.winner?.reason==='triple'?'트리플 독점':room.winner?.reason==='bankruptcy'?'ALL 파산':'턴 종료'} ×{room.winner?.multiplier}</div><p>우승 판돈 지급: {gold(room.winner?.payout??(5000000*(room.winner?.multiplier||1)))}</p><button className="btn btn-secondary" onClick={()=>onCall('room:leave')}>로비로 돌아가기</button></>:
           <>{myTurn&&room.pending?<div className="hud-alert">선택해야 할 효과가 있습니다 ↓</div>:null}<button className="btn hud-primary-roll" onClick={()=>onCall('game:roll')} disabled={!rollReady}><span>🎲</span> {moving?'굴러가는 중...':rollReady?'주사위 굴리기':'주사위 대기'}</button><div className="hud-auto-turn">⏱ 턴은 자동으로 종료됩니다 · {remaining}초</div></>}
         </section>
-        {room.status==='playing'&&myTurn&&room.pending&&<section className="hud-action-box"><div className="hud-action-label">🎴 선택형 이벤트</div><PendingChoice room={room} onCall={onCall}/></section>}
-        {room.status==='playing'&&myTurn&&!room.pending&&<section className="hud-action-box">
-          <div className="hud-action-label">⚡ 현재 칸 행동</div><h3>{landed?.name}</h3><p>선택할 행동이 없으면 자동으로 다음 턴으로 넘어갑니다.</p>
-          {canBuy&&<button className="btn btn-buy" onClick={()=>onCall('game:buy')}>💰 이 지역 구매 · {gold(landed.price)}</button>}
-          {canBuild&&<div className="hud-build-buttons">{showBuild(1)}{showBuild(3)}</div>}
-          {canAcquire&&<button className="btn btn-buy" onClick={()=>onCall('game:acquire')}>✨ 인수 무료권 사용</button>}
-          {!canBuy&&!canBuild&&!canAcquire&&<div className="hud-alert">{animationLocked?'말이 1칸씩 이동 중입니다.':room.phase==='roll'?'주사위 버튼을 눌러주세요.':'현재 가능한 구매 / 건설 행동이 없습니다.'}</div>}
-        </section>}
-        {room.status==='playing'&&<section className="hud-action-box"><div className="hud-action-label">🎴 보유 카드</div><div className="hud-held-cards"><button className="hud-held-card" disabled={!myTurn||!(me?.guardian>0)||animationLocked||!!room.pending} onClick={()=>onCall('game:card',{card:'guardian'})}>🪽 수호천사 ×{me?.guardian||0} 사용</button><span className="hud-held-card">🔓 탈옥권 ×{me?.escapeTickets||0}</span><span className="hud-held-card">✨ 무료 인수 ×{me?.freeAcquire||0}</span></div><p style={{marginTop:9}}>수호천사는 즉시 사용하거나 보관했다가 주사위 전에 사용할 수 있습니다.</p></section>}
+        {room.status==='playing'&&myTurn&&!room.pending&&(canBuy||canBuild||canAcquire)&&<section className="hud-action-box"><button className="btn btn-buy" onClick={()=>setDialog('land')}>🏗 지역 구매 · 건설</button></section>}
+        {room.status==='playing'&&<section className="hud-action-box"><button className="btn btn-secondary btn-wide" onClick={()=>setDialog('cards')}>🎴 보유 아이템 보기 · 수호천사 {me?.guardian||0}장</button></section>}
         <section className="hud-action-box"><div className="hud-action-label">📍 지역 정보 · #{shown.id}</div><h3>{shown.name}</h3><p>{TYPE_LABEL[shown.type]||shown.type}</p>{['property','tourist'].includes(shown.type)&&<><div className="hud-line"><span>소유자</span><b>{owner?.nickname||'없음'}</b></div><div className="hud-line"><span>땅값</span><b>{gold(shown.price)}</b></div><div className="hud-line"><span>건설 단계</span><b>{shown.type==='tourist'?'관광지':BUILD_LEVELS[shown.level]}</b></div></>}<p style={{marginTop:9}}>보드 위 지역을 클릭하면 이 정보가 바뀝니다.</p></section>
-        <section className="hud-action-box"><div className="hud-action-label">📢 게임 알림</div>{room.logs?.slice(0,5).map(l=><div className="hud-log" key={l.id}>{l.text}</div>)}</section>
+        {room.logs?.[0]&&<div className="hud-last-log" role="status">{room.logs[0].text}</div>}
       </aside>
     </div>
+    {room.status==='playing'&&((myTurn&&room.pending&&!animationLocked)||(dialog==='land'&&myTurn&&(canBuy||canBuild||canAcquire))||dialog==='cards')&&
+      <div className="marble-popup-cover">
+        <div className="marble-popup" role="dialog" aria-modal="true" aria-label={room.pending?'이벤트 선택':dialog==='land'?'부동산 거래':'보유 아이템'}>
+          {myTurn&&room.pending&&!animationLocked?<><div className="marble-popup-kicker">🎴 이벤트 · 선택형 아이템</div><PendingChoice room={room} onCall={onCall}/></>:
+           dialog==='land'?<>
+             <div className="marble-popup-kicker">🏗 지역 행동 · 현재 도착 지역</div>
+             <h2>{landed.name}</h2>
+             <p>보유 게임머니 <b>{gold(me?.gold||0)}</b> · 건설비 40% 인하 적용</p>
+             <div className="marble-popup-actions">
+               {canBuy&&<button className="btn btn-buy" onClick={()=>onCall('game:buy').then(ok=>{if(ok)setDialog(null)})}>💰 {landed.type==='tourist'?'관광지':'지역'} 매입 · {gold(landed.price)}</button>}
+               {canBuild&&<><p>건물을 건설할 단계를 선택하세요.</p><div className="hud-build-buttons">{showBuild(1)}{showBuild(3)}</div></>}
+               {canAcquire&&<button className="btn btn-buy" onClick={()=>onCall('game:acquire').then(ok=>{if(ok)setDialog(null)})}>✨ 무료 인수권 사용</button>}
+             </div>
+             <div className="marble-popup-footer"><button className="marble-popup-dismiss" onClick={()=>{setDismissedLand(landingKey);setDialog(null)}}>건너뛰기 · 자동 턴 종료</button></div>
+           </>:<>
+             <div className="marble-popup-kicker">🎴 보유 아이템</div>
+             <h2>내 아이템</h2>
+             <p>수호천사 {me?.guardian||0}장 · 탈옥권 {me?.escapeTickets||0}장 · 무료 인수권 {me?.freeAcquire||0}장</p>
+             <div className="marble-popup-actions">
+               <button className="btn btn-secondary" disabled={!myTurn||!(me?.guardian>0)||animationLocked||!!room.pending} onClick={()=>onCall('game:card',{card:'guardian'}).then(ok=>{if(ok)setDialog(null)})}>🪽 수호천사 사용 · 통행료 보호막</button>
+             </div>
+             <div className="marble-popup-footer"><button className="marble-popup-dismiss" onClick={()=>setDialog(null)}>닫기</button></div>
+           </>}
+        </div>
+      </div>}
   </div>;
 }
 export default function App(){
