@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TILES, CHANCE_CARDS, START_GOLD, ACCOUNT_START_WALLET, MATCH_STAKE, GROUPS, TOURIST_IDS} from './data.js';
-import {createRoom, joinRoom, startGame, roll, buy, build, endTurn, resolve as resolveEffect, useHeldCard} from './engine.js';
+import {createRoom, joinRoom, startGame, roll, buy, build, buildCost, endTurn, resolve as resolveEffect, useHeldCard} from './engine.js';
 const a={id:'a',nickname:'A',username:'a'};const b={id:'b',nickname:'B',username:'b'};
 function setup(){const r=createRoom(a,{name:'test'});joinRoom(r,b);r.players[1].ready=true;startGame(r,'a');return r;}
 test('board exactly 37 positions, names, tourism and chance',()=>{
@@ -82,4 +82,10 @@ test('free acquire ticket is not consumed when buying unowned land',()=>{
   r.players[0].freeAcquire=1;
   buy(r,'a');assert.equal(r.players[0].freeAcquire,1);
   assert.equal(r.players[0].gold, START_GOLD-r.tiles[2].price);
+});
+
+test('building price ladder is affordable and matches the displayed amounts',()=>{
+  const tile={price:300_000};
+  assert.equal(buildCost(tile,1),135_000);
+  assert.equal(buildCost(tile,4),297_000);
 });
