@@ -17,7 +17,20 @@ const sides=[
 ];
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export const positionFor=id=>sides[((Number(id)||0)%37+37)%37];
-export const buildPrice=(tile,q)=>Array.from({length:q},(_,i)=>Math.round(tile.price*(.45+(tile.level+i+1)*.30))).reduce((a,b)=>a+b,0);
+export const buildPrice=(tile,q)=>Array.from({length:q},(_,i)=>Math.round(tile.price*(.27+(tile.level+i+1)*.18))).reduce((a,b)=>a+b,0);
+
+const PIP_CELLS={1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
+const FACE_ROTATIONS={1:[0,0],2:[0,-90],3:[0,-180],4:[0,90],5:[-90,0],6:[90,0]};
+function DiceCube({value=1,index=0,rolling=false}){
+  const [rx,ry]=FACE_ROTATIONS[Math.max(1,Math.min(6,Number(value)||1))];
+  return <div className="die-perspective" aria-label={`주사위 ${index+1}: ${value}점`} role="img">
+    <div className={`dice-cube ${rolling?'dice-cube--rolling':''}`} style={{'--dice-x':rx+'deg','--dice-y':ry+'deg','--dice-delay':(index*.08)+'s'}}>
+      {[1,2,3,4,5,6].map(face=><div className={`dice-face dice-face--${face}`} key={face}>
+        {Array.from({length:9},(_,i)=><i className={`dice-pip ${PIP_CELLS[face].includes(i+1)?'':'dice-pip--empty'}`} key={i}/>)}
+      </div>)}
+    </div>
+  </div>;
+}
 function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=null,onMotionChange=()=>{}}){
   const [visual,setVisual]=useState({});
   const [motion,setMotion]=useState(false);
@@ -61,8 +74,8 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
         <div className="marble-center-subtitle">TATSUNG MARBLE</div>
         <div className="marble-center-rule">굴리고 · 건설하고 · 독점하라</div>
         <div className={'world-dice '+(motion?'is-rolling':'')} aria-live="polite">
-          <span className="world-die" aria-label="첫 번째 주사위">{['⚀','⚁','⚂','⚃','⚄','⚅'][Math.max(1,faces[0])-1]}</span>
-          <span className="world-die" aria-label="두 번째 주사위">{['⚀','⚁','⚂','⚃','⚄','⚅'][Math.max(1,faces[1])-1]}</span>
+          <DiceCube value={faces[0]} index={0} rolling={motion}/>
+          <DiceCube value={faces[1]} index={1} rolling={motion}/>
         </div>
         <div className="marble-center-message">{motion?`${currentPlayer?.nickname||'플레이어'} 이동 중 · 모두 함께 보는 주사위`:lastRoll?.dice?`최근 주사위 ${lastRoll.dice[0]} + ${lastRoll.dice[1]} = ${lastRoll.dice[0]+lastRoll.dice[1]}`:'주사위를 굴려 여행을 시작하세요!'}</div>
         <div className="marble-center-legend"><span>🏠 소도시</span><span>🏘 마을</span><span>🏙 국가</span><span>✨ 랜드마크</span></div>
