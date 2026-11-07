@@ -92,9 +92,10 @@ function Game({room,user,onCall}){
     else if(!(canBuild||canTourist||canPaidAcquire))setDialog(x=>x==='build'?null:x);
   },[myTurn,canBuild,canTourist,canPaidAcquire,landingKey,dismissedLanding]);
   const buildAt=q=>{
-    const cost=buildPrice(landed,q);
-    return <button key={q} className="marble-dialog-primary" disabled={!canBuild||(q>1&&((me?.laps||0)<3||landed.ownerId==null))||landed.level+q>4||(me?.gold||0)<cost} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q}).then(ok=>{if(ok)setDialog(null)})}>
-      {q===1?'🏠 1단계 건설':q===2?'🏘 2단계 건설':'🏙 3단계 건설'} <strong>{gold(cost)}</strong>
+    const cost=buildPrice(landed,q),level=landed?.level||0,lap=me?.laps||0;
+    const allowed=q===1||(q===2&&lap>=1&&level<=1)||(q===3&&lap>=3&&level===0);
+    return <button key={q} className="marble-dialog-primary" disabled={!canBuild||!allowed||(level===3&&q!==1)||(level<3&&level+q>3)||level+q>4||(me?.gold||0)<cost} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q}).then(ok=>{if(ok)setDialog(null)})}>
+      {level===3?'🏰 랜드마크 완성':q===1?'🏠 건물 1개 추가':q===2?'🏘 건물 2개 추가':'🏙 건물 3개 추가'} <strong>{gold(cost)}</strong>
     </button>;
   };
   const hasPending=myTurn&&!!room.pending&&!animationLocked;
@@ -150,7 +151,7 @@ function Game({room,user,onCall}){
         hasPending?<><div className="marble-popup-kicker">🎴 CHANCE / EVENT</div><PendingChoice room={room} onCall={onCall}/></>:
         dialog==='build'&&openBuild?<><div className="marble-popup-kicker">🏗 CONSTRUCTION</div><h2>{landed.name}</h2><p>현재 게임머니 <b>{gold(me?.gold||0)}</b></p>
           <div className="marble-popup-actions">
-            {canBuild&&<><p>{landed.ownerId==null?'첫 건설 시 자동으로 이 지역의 소유자가 됩니다.':`현재 ${BUILD_LEVELS[landed.level]} · 추가 건설 선택`}</p><p>1바퀴 완주: 2단계 · 3바퀴 완주: 3단계 건설 가능</p>{buildAt(1)}{(me?.laps||0)>=1&&landed.level+2<=4&&buildAt(2)}{(me?.laps||0)>=3&&landed.level+3<=4&&buildAt(3)}</>}
+            {canBuild&&<><p>{landed.ownerId==null?'빈 땅: 첫 건설 시 이 지역을 자동으로 소유합니다.':landed.level===3?'건물 3개 완성! 이제 랜드마크를 별도로 건설할 수 있습니다.':`현재 건물 ${Math.min(landed.level,3)}/3개 · 추가 건설 가능`}</p><p>일반 건물 최대 3개 · 1바퀴 완주 시 2개씩 · 3바퀴 완주 시 한 번에 3개 건설 · 랜드마크는 건물 3개를 완성한 다음 건설</p>{buildAt(1)}{(me?.laps||0)>=1&&landed.level+2<=3&&buildAt(2)}{(me?.laps||0)>=3&&landed.level===0&&buildAt(3)}</>}
             {canTourist&&<button className="marble-dialog-primary" disabled={(me?.gold||0)<landed.price} onClick={()=>onCall('game:buy').then(ok=>{if(ok)setDialog(null)})}>★ 관광지 확보 <strong>{gold(landed.price)}</strong></button>}
             {canPaidAcquire&&<div className="marble-acquire-info">
               <h3>🏷 {landedOwner?.nickname||'상대'}님의 지역 인수</h3>
@@ -167,7 +168,7 @@ function Game({room,user,onCall}){
           <p>{TYPE_LABEL[shown.type]||shown.type} · {shown.ownerId!=null?'소유 중':'미소유'}</p>
           {['property','tourist'].includes(shown.type)&&<div className="marble-region-details">
             <p>소유자: <b style={{color:owner?(pawnColor[owner.character]||'#ffe9a7'):undefined}}>{owner?.nickname||'없음'}</b> {owner?'· '+('P'+(room.players.findIndex(p=>p.userId===owner.userId)+1)):''}</p>
-            <p>건물 단계: <b>{shown.type==='tourist'?'관광지':BUILD_LEVELS[shown.level]}</b></p>
+            <p>건설 상태: <b>{shown.type==='tourist'?'관광지':shown.level===4?'랜드마크 · 3개 완성 후 건설':`일반 건물 ${shown.level}/3개`}</b></p>
             <p>이 칸을 밟으면 내는 통행료: <b>{shown.ownerId!=null?gold(shownToll):'0 G (미소유)'}</b></p>
             {shown.type==='property'&&shown.ownerId!=null&&shown.level<4&&<p>유료 인수 가격: <b>{gold(takeoverPrice(shown))}</b> · 해당 칸 방문 시 인수 가능</p>}
             {shown.level===4&&<p>🏛 랜드마크는 인수할 수 없습니다.</p>}
