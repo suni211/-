@@ -4,7 +4,8 @@ import {BUILD_LEVELS, CHANCE_CARDS, GROUPS, MAX_ROUNDS, START_BONUS, START_GOLD,
 const now = () => Date.now();
 export const sample = (n) => randomInt(n);
 export const rollDie = (rand=sample) => rand(6)+1;
-export const buildCost = (tile,level) => Math.round(tile.price * (0.45 + level * 0.30));
+// Match the client price preview; 40% discount from original building costs.
+export const buildCost = (tile,level) => Math.round(tile.price * (0.27 + level * 0.18));
 export const netWorth = (room,p) => p.gold + room.tiles.reduce((sum,t) => t.ownerId === p.userId ? sum+t.price+Array.from({length:t.level},(_,i)=>buildCost(t,i+1)).reduce((a,b)=>a+b,0) : sum,0);
 const error = text => {throw new Error(text);};
 const requirePlayer = (room,userId) => room.players.find(p=>p.userId === userId) || error('게임방에 참가하지 않았습니다.');
