@@ -81,7 +81,7 @@ function Game({room,user,onCall}){
   const round=Math.min(25,Math.floor((room.turnCount||0)/room.players.length)+1);
   const rollReady=myTurn&&room.phase==='roll'&&!moving;
   const ownedTourists=room.tiles.filter(t=>t.type==='tourist'&&t.ownerId===user.id).length;
-  const showBuild=q=>{const total=buildPrice(landed,q);return <button className="btn btn-buy" disabled={!canBuild||(q>1&&me.laps<3)||landed.level+q>4||me.gold<total} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q}).then(ok=>{if(ok)setDialog(null)})}>🏗 ${q}단계 건설 · ${gold(total)}</button>};
+  const showBuild=q=>{const total=buildPrice(landed,q);return <button className="btn btn-buy" disabled={!canBuild||(q>1&&me.laps<3)||landed.level+q>4||me.gold<total} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q}).then(ok=>{if(ok)setDialog(null)})}>🏗 {q}단계 건설 · {gold(total)}</button>};
   const landingKey=`${room.id}:${room.lastRoll?.at||0}:${me?.position||0}`;
   useEffect(()=>{
     if(!myTurn){setDialog(null);return;}
@@ -91,8 +91,7 @@ function Game({room,user,onCall}){
   return <div className="marble-arena">
     <header className="marble-hud-top">
       <div className="marble-hud-logo">✦ 탓승마블<small>TATSUNG MARBLE</small></div>
-      <div className="marble-hud-chip"><span>참가 판돈 (계정)</span><b>5,000,000 G</b></div>
-      <div className="marble-hud-chip"><span>게임 시작 자금</span><b>1,000,000 G</b></div>
+      <div className="marble-hud-chip"><span>판돈 500만 · 시작 100만</span><b>게임머니 {gold(me?.gold||0)}</b></div>
       <div className="marble-hud-chip rounds"><span>게임 라운드</span><b>{round} / 25</b></div>
       <div className="marble-hud-chip countdown"><span>{room.phase==='roll'?'주사위 제한':'자동 턴 종료'}</span><b>{remaining}초</b></div>
       <div className="marble-hud-spacer"/>
