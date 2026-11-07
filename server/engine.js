@@ -5,7 +5,7 @@ const now = () => Date.now();
 export const sample = (n) => randomInt(n);
 export const rollDie = (rand=sample) => rand(6)+1;
 // Match the client price preview; 40% discount from original building costs.
-export const buildCost = (tile,level) => Math.round(tile.price * (0.27 + level * 0.18));
+export const buildCost = (tile,level) => Math.round(tile.price * (0.06 + level * 0.04));
 export const netWorth = (room,p) => p.gold + room.tiles.reduce((sum,t) => t.ownerId === p.userId ? sum+t.price+Array.from({length:t.level},(_,i)=>buildCost(t,i+1)).reduce((a,b)=>a+b,0) : sum,0);
 const error = text => {throw new Error(text);};
 const requirePlayer = (room,userId) => room.players.find(p=>p.userId === userId) || error('게임방에 참가하지 않았습니다.');
@@ -127,33 +127,40 @@ export function startGame(room,userId){if(room.status!=='waiting'||room.hostId!=
 export function roll(room,userId,rand=sample){const p=assertTurn(room,userId);assertPhase(room,'roll');room.pending=null;room.lastChance=null;
   if(p.jailTurns>0){if(p.escapeTickets>0){p.escapeTickets--;p.jailTurns=0;log(room,`${p.nickname}님 탈옥권 사용`);}else{p.jailTurns--;room.phase='decide';room.decisionDeadline=now()+1500;log(room,`${p.nickname}님 감옥 대기 · ${p.jailTurns}턴 남음`);return;}}
   const dice=[rollDie(rand),rollDie(rand)];const from=p.position,to=(from+dice[0]+dice[1])%room.tiles.length;
-  room.lastRoll={dice,userId,at:now(),from,to,steps:dice[0]+dice[1]};
+  room.lastRoll={dice,userId,at:now(),from,to,steps:dice[0]+dice[1],double:dice[0]===dice[1]};
   room.visualLockUntil=now()+3000;room.decisionDeadline=now()+15500;
   p.builtThisLanding=false;moveTo(room,p,to,{passStart:true});
   room.phase='decide';log(room,`${p.nickname}님 ${dice[0]} + ${dice[1]} = ${dice[0]+dice[1]}칸 이동 → ${room.tiles[p.position].name}`);
   onLanding(room,p,rand);
+  if(room.status==='playing' && !p.bankrupt && room.lastRoll.double){p.extraRoll++;log(room,`${p.nickname}님 DOUBLE! 같은 턴에 추가 주사위`);}
   if(room.status==='playing' && p.bankrupt){room.turnCount++;room.turnIndex=nextActive(room,room.turnIndex);room.phase='roll';room.pending=null;}
   else if(room.status==='playing')room.phase='decide';
 }
-export function buy(room,userId){const p=assertTurn(room,userId);assertPhase(room,'decide');if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
-  const t=tileAt(room,p.position);if(!['property','tourist'].includes(t.type)||t.ownerId)error('구매할 수 없는 지역입니다.');
-  const price=t.price;if(p.gold<price)error('골드가 부족합니다.');
-  p.gold-=price;t.ownerId=p.userId;t.level=0;
-  log(room,`${p.nickname}님 ${t.name} 매입 (건설은 별도)`);checkWinner(room);
+// Tourist destinations are purchased; ordinary regions are claimed by constructing level one.
+export function buy(room,userId){
+  const p=assertTurn(room,userId);assertPhase(room,'decide');
+  if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
+  const t=tileAt(room,p.position);
+  if(!t||t.type!=='tourist'||t.ownerId!=null)error('관광지만 별도로 소유할 수 있습니다. 일반 지역은 건설하세요.');
+  if(p.gold<t.price)error('게임머니가 부족합니다.');
+  p.gold-=t.price;t.ownerId=p.userId;
+  log(room,`${p.nickname}님 관광지 ${t.name} 확보 · ${t.price.toLocaleString()}G`);
+  checkWinner(room);
 }
 export function build(room,userId,tileId,quantity=1){
   const p=assertTurn(room,userId);assertPhase(room,'decide');
   if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
   const t=tileAt(room,Number(tileId));
-  if(!t||t.id!==p.position||t.type!=='property'||t.ownerId!==userId||t.level>=4)error('내가 도착한 도시만 건설할 수 있습니다.');
+  if(!t||t.id!==p.position||t.type!=='property'||(t.ownerId!=null&&t.ownerId!==userId)||t.level>=4)error('빈 땅 또는 본인 지역에서만 건설할 수 있습니다.');
   if(p.builtThisLanding)error('이 지역에서는 이미 건설했습니다. 다음 방문을 기다려주세요.');
   const q=Number(quantity);
   if(!Number.isInteger(q)||q<1||q>3)error('건설 수량이 올바르지 않습니다.');
-  if(q>1&&p.laps<3)error('스타트를 3바퀴 돌아야 한 번에 여러 건물을 지을 수 있습니다.');
+  if(q>1&&(p.laps<3||t.ownerId==null))error('3바퀴를 돌고 이미 소유한 지역에서만 한 번에 여러 건물을 지을 수 있습니다.');
   if(t.level+q>4)error('랜드마크 이상 건설할 수 없습니다.');
   const total=Array.from({length:q},(_,i)=>buildCost(t,t.level+i+1)).reduce((a,b)=>a+b,0);
   if(p.gold<total)error('게임머니가 부족합니다.');
-  p.gold-=total;t.level+=q;p.builtThisLanding=true;
+  p.gold-=total;if(t.ownerId==null)t.ownerId=userId;t.level+=q;p.builtThisLanding=true;
+  checkWinner(room);
   log(room,`${p.nickname}님 ${t.name} → ${BUILD_LEVELS[t.level]} (${q}단계)`);
 }
 export function acquire(room,userId){const p=assertTurn(room,userId);assertPhase(room,'decide');if(room.pending)error('미해결 카드가 있습니다.');
