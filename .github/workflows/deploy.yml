@@ -41,4 +41,4 @@ jobs:
           GCE_USER: ${{ secrets.GCE_USER }}
         run: |
           ssh -o StrictHostKeyChecking=yes "$GCE_USER@$GCE_HOST" \
-            'cd /opt/tatsung-marble && git fetch --prune origin main && git checkout main && git reset --hard origin/main && docker compose --env-file .env up -d --build --remove-orphans'
+            'cd /opt/tatsung-marble && git fetch --prune origin main && git checkout main && git reset --hard origin/main && docker compose -f compose.yaml -f compose.nginx.yaml --env-file .env up -d --build db app'
