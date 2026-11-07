@@ -98,7 +98,7 @@ function Game({room,user,onCall}){
   const openBuild=myTurn&&(canBuild||canTourist||canAcquire);
   const showDialog=isWinner||hasPending||dialog==='cards'||dialog==='menu'||dialog==='region'||(dialog==='build'&&openBuild);
   const closeDialog=()=>{if(dialog==='build')setDismissedLanding(landingKey);setDialog(null)};
-  const hudSlots=['top-left','bottom-left','bottom-right','top-right'];
+  const hudSlots=room.players.length===2?['top-left','bottom-right']:room.players.length===3?['top-left','bottom-left','bottom-right']:['top-left','bottom-left','bottom-right','top-right'];
   return <div className="marble-arena marble-arena--classic">
     <header className="marble-classic-top">
       <div className="marble-classic-brand">✦ 탓승마블</div>
