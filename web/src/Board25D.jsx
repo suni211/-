@@ -9,12 +9,36 @@ const INNER=[[800,717],[275,450],[800,183],[1325,450],[800,717]];
 const GROUP_COLORS=['#f0ad45','#f47795','#65b9f7','#50dfba','#a58af6','#ebbd63','#d584e5','#6fcfdb','#8dca60'];
 const PLAYER_COLORS={tatsung:'#ffe177',mint:'#75efc3',berry:'#ff8cac',sky:'#8dbafc'};
 const KIND_ICONS={start:'🏁',jail:'🔒',chance:'?',tourist:'★',minigame:'🎲',olympics:'🏆',airport:'✈',tax:'🏦'};
-const STAGE_VARIANTS={
-  1:['🏠','🏡','🛖','🏘','🏚','🏕','🏠','🏡'],
-  2:['🏘','🏡','🏫','🏪','🏩','🏬','🏤','🏣'],
-  3:['🏙','🏢','🏬','🏨','🏦','🏥','🏤','🏛']
+// Buildings are lightweight isometric SVG solids. Both plot ownership and roofs
+// use the SAME player color; group colors stay as the thin outer edge only.
+const tone=(hex,ratio)=>{
+  const n=parseInt(hex.slice(1),16);
+  return '#'+[16,8,0].map(shift=>Math.min(255,Math.round(((n>>shift)&255)*ratio)).toString(16).padStart(2,'0')).join('');
 };
-const LANDMARK_VARIANTS=['🏰','🗼','🏯','🏛','🏟','🏢','🕌','🗽','🏔','🏜','🛕','⛩','🌉','🗿','🎡','🏭'];
+function Building25D({x,y,level,color,variant=0}){
+  const height=[0,18,28,39,51][level]||18;
+  const width=level>=3?31:level===2?28:25;
+  const half=width/2,top=12-height;
+  const bright=tone(color,1.15),shadow=tone(color,.56),side=tone(color,.78);
+  return <g className={'classic-building classic-building--level-'+level}
+     transform={`translate(${x} ${y})`} pointerEvents="none">
+    <ellipse cx="0" cy="17" rx={half+8} ry="8" fill="#131827" opacity=".42"/>
+    <polygon points={`${-half},${top} 0,${top-9} ${half},${top} 0,${top+9}`} fill={bright} stroke="#fff4d0" strokeWidth="1.4" strokeLinejoin="round"/>
+    <polygon points={`${-half},${top} 0,${top+9} 0,21 ${-half},12`} fill={shadow} stroke="#354052" strokeWidth="1.1"/>
+    <polygon points={`0,${top+9} ${half},${top} ${half},12 0,21`} fill={color} stroke="#354052" strokeWidth="1.1"/>
+    <path d={`M${-half+4} ${top+14}v7 M${-half+10} ${top+17}v7 M${half-5} ${top+9}v8 M${half-11} ${top+13}v8`} stroke="#e8f7ff" strokeWidth={level>=2?3:2} opacity=".95" />
+    {level>=2&&<path d={`M${-half+4} ${top+27}v6 M${half-5} ${top+25}v7`} stroke="#c4edff" strokeWidth="3.3"/>}
+    {level>=3&&<path d={`M${-half+4} ${top+39}v6 M${half-5} ${top+36}v7`} stroke="#f4fbff" strokeWidth="3"/>}
+    {level===1&&<path d={`M-6 ${top-4}L0 ${top-14}L6 ${top-4}`} fill={side} stroke="#fff3bb" strokeWidth="1.5"/>}
+    {level===2&&<path d={`M${-half+4} ${top-4}v-9h6v6`} fill={side} stroke="#fff3c7" strokeWidth="1.5"/>}
+    {level===3&&<path d={`M0 ${top-9}v-13`} stroke="#f2e6cf" strokeWidth="3"/>}
+    {level===4&&<>
+      <path d={`M${-half-4} ${top+1} L0 ${top-20} L${half+4} ${top+1} Z`} fill={variant%2?'#f6cf79':'#f0e3b8'} stroke="#fff7cd" strokeWidth="2"/>
+      <path d={`M0 ${top-20}v-10`} stroke="#fff1b8" strokeWidth="3"/>
+      <circle cx="0" cy={top-30} r="3.5" fill="#ffe184"/>
+    </>}
+  </g>;
+}
 const linear=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
 const pack=points=>points.map(p=>p.map(n=>n.toFixed(2)).join(',')).join(' ');
 const geomFor=id=>{
@@ -25,13 +49,16 @@ const geomFor=id=>{
   const o0=linear(OUTER[side],OUTER[side+1],t0),o1=linear(OUTER[side],OUTER[side+1],t1);
   const i0=linear(INNER[side],INNER[side+1],t0),i1=linear(INNER[side],INNER[side+1],t1);
   const om=linear(o0,o1,.5),im=linear(i0,i1,.5);
-  const label=linear(om,im,.71),number=linear(om,im,.14),building=linear(om,im,.43),pawn=linear(om,im,.24);
+  const label=linear(om,im,.66),number=linear(om,im,.13),building=linear(om,im,.47),pawn=linear(om,im,.23);
+  const ownerTag=linear(om,im,.91);
+  const ownerBand=pack([linear(o0,i0,.81),linear(o1,i1,.81),i1,i0]);
   let angle=Math.atan2(o1[1]-o0[1],o1[0]-o0[0])*180/Math.PI;
   if(angle>90)angle-=180;
   if(angle< -90)angle+=180;
   return {
     points:pack([o0,o1,i1,i0]),
-    accent:pack([o0,o1,linear(o1,i1,.34),linear(o0,i0,.34)]),
+    accent:pack([o0,o1,linear(o1,i1,.19),linear(o0,i0,.19)]),
+    ownerBand,ownerTag,
     label,number,building,pawn,angle,side
   };
 };
@@ -53,27 +80,36 @@ function DiceCube({value=1,index=0,rolling=false}){
     </div>
   </div>;
 }
-function TileCell({tile,geom,selected,onSelect}){
+function TileCell({tile,geom,selected,onSelect,players}){
   const owned=tile.ownerId!=null,isProperty=tile.type==='property';
-  const color=isProperty?GROUP_COLORS[Math.max(0,tile.group)%GROUP_COLORS.length]:
+  const ownerIndex=players.findIndex(p=>p.userId===tile.ownerId);
+  const owner=ownerIndex>=0?players[ownerIndex]:null;
+  const ownerColor=owner?(PLAYER_COLORS[owner.character]||PLAYER_COLORS.tatsung):null;
+  const groupColor=isProperty?GROUP_COLORS[Math.max(0,tile.group)%GROUP_COLORS.length]:
     ({tourist:'#f9d377',chance:'#c9afe9',start:'#9cda72',jail:'#ec9da6',airport:'#96d6e8',olympics:'#f3d27f',minigame:'#a1eed7',tax:'#e8aa97'})[tile.type]||'#c8d9e2';
-  const icon=tile.level>0?(tile.level===4?LANDMARK_VARIANTS[(tile.id*7+Math.max(0,tile.group))%LANDMARK_VARIANTS.length]:
-    STAGE_VARIANTS[tile.level][(tile.id+Math.max(0,tile.group)*3)%8]):KIND_ICONS[tile.type]||'';
+  const icon=!isProperty?KIND_ICONS[tile.type]||'':'';
   const full=tile.name.length>8?[tile.name.slice(0,8),tile.name.slice(8,15)+(tile.name.length>15?'…':'')]:[tile.name];
   const angle=`rotate(${geom.angle} ${geom.label[0]} ${geom.label[1]})`;
-  const cx=geom.label[0],cy=geom.label[1];
+  const cx=geom.label[0],cy=geom.label[1],tag=geom.ownerTag;
+  const ownerIdLabel=ownerIndex>=0?'P'+(ownerIndex+1):'소유';
   return <g className={`classic-svg-cell ${selected?'is-selected':''} ${owned?'is-owned':''}`}
-      role="button" tabIndex={0} aria-label={`${tile.id}번 ${tile.name}${owned?' · 소유 중':''}`}
+      role="button" tabIndex={0} aria-label={`${tile.id}번 ${tile.name}${owned?' · '+(owner?.nickname||'소유 중')+' 소유':''}`}
       onClick={()=>onSelect(tile.id)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(tile.id);}}}>
-    <title>{`${tile.id}번 · ${tile.name}`}</title>
-    <polygon points={geom.points} fill="#f6f5ec" stroke={selected?'#ffe17d':'#655954'} strokeWidth={selected?5:2.3} strokeLinejoin="round"/>
-    <polygon points={geom.accent} fill={color} opacity="1"/>
-    <text className="classic-cell-number" x={geom.number[0]} y={geom.number[1]} textAnchor="middle" dominantBaseline="middle" transform={`rotate(${geom.angle} ${geom.number[0]} ${geom.number[1]})`}>{String(tile.id).padStart(2,'0')}</text>
+    <title>{`${tile.id}번 · ${tile.name}${owned?' · '+(owner?.nickname||'소유 중')+' 소유':''}`}</title>
+    <polygon points={geom.points} fill={ownerColor||'#f6f5ec'} fillOpacity={owned?.72:1}
+      stroke={ownerColor||'#655954'} strokeWidth={owned?5:selected?4:2.3} strokeLinejoin="round"/>
+    <polygon points={geom.accent} fill={groupColor}/>
+    {owned&&<polygon className="classic-owner-band" points={geom.ownerBand} fill={ownerColor||'#a7a7a7'} stroke="#252432" strokeWidth="1.6"/>}
+    <text className="classic-cell-number" x={geom.number[0]} y={geom.number[1]}
+       textAnchor="middle" dominantBaseline="middle"
+       transform={`rotate(${geom.angle} ${geom.number[0]} ${geom.number[1]})`}>{String(tile.id).padStart(2,'0')}</text>
+    {isProperty&&owned&&tile.level>0&&<Building25D x={geom.building[0]} y={geom.building[1]} level={tile.level} color={ownerColor||'#b6b6b6'} variant={tile.id}/>}
     {icon&&<text className="classic-cell-icon" x={geom.building[0]} y={geom.building[1]} textAnchor="middle" dominantBaseline="middle">{icon}</text>}
     <text className="classic-cell-name" x={cx} y={cy} transform={angle} textAnchor="middle" dominantBaseline="middle">
       {full.length===1?full[0]:<><tspan x={cx} dy="-8">{full[0]}</tspan><tspan x={cx} dy="18">{full[1]}</tspan></>}
     </text>
-    {owned&&<circle cx={geom.number[0]+12} cy={geom.number[1]-6} r="6" stroke="#fff0ac" strokeWidth="2" fill="#7653a2"/>}
+    {owned&&<text className="classic-cell-owner-id" x={tag[0]} y={tag[1]} textAnchor="middle"
+         dominantBaseline="middle" transform={`rotate(${geom.angle} ${tag[0]} ${tag[1]})`}>{ownerIdLabel}</text>}
   </g>;
 }
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -118,6 +154,9 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
       <div className="marble-board-plaza">
         <div className="marble-center-title">✦ 탓승마블</div>
         <div className="marble-center-subtitle">41칸 · 건설 · 독점</div>
+        <div className="marble-owner-legend" aria-label="플레이어별 소유 색상">
+          {players.map((p,i)=><span key={p.userId} style={{'--owner-color':PLAYER_COLORS[p.character]||PLAYER_COLORS.tatsung}}><b>P{i+1}</b> {p.nickname}</span>)}
+        </div>
         <div className="marble-deck" aria-hidden="true"><div className="marble-deck-card">?</div><span>CHANCE</span></div>
         <div className={'world-dice '+(motion?'is-rolling':'')} aria-live="polite">
           <DiceCube value={faces[0]} index={0} rolling={motion}/>
@@ -134,7 +173,7 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
       <svg className="classic-board-svg" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-label="41칸 순환 보드">
         <polygon points="800,895 20,450 800,5 1580,450" fill="#251d1c" opacity=".7"/>
         <polygon points="800,881 40,450 800,19 1560,450" fill="none" stroke="#c49b65" strokeWidth="9"/>
-        {tiles.map(tile=><TileCell key={tile.id} tile={tile} geom={GEOMETRY[tile.id]} selected={selected===tile.id} onSelect={onSelect}/>)}
+        {tiles.map(tile=><TileCell key={tile.id} tile={tile} geom={GEOMETRY[tile.id]} selected={selected===tile.id} onSelect={onSelect} players={players}/>)}
         <polygon points="800,717 275,450 800,183 1325,450" fill="none" stroke="#a48867" strokeWidth="6" pointerEvents="none"/>
       </svg>
       {occupied.map(({p,index})=>{
