@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {io} from 'socket.io-client';
 import {ArrowRight, Bell, Check, ChevronRight, CircleHelp, Clock3, Coins, Copy, Crown, Dice5, DoorOpen, Eye, EyeOff, Flag, Gamepad2, Globe2, LockKeyhole, LogOut, Menu, Plus, RefreshCw, RotateCcw, Shield, Sparkles, Trophy, Users, X} from 'lucide-react';
-import Board25D,{buildPrice} from './Board25D.jsx';
+import Board25D,{buildPrice,takeoverPrice,landingToll} from './Board25D.jsx';
 import {PREVIEW_TILES, CHARACTERS, BUILD_LEVELS} from './data.js';
 
 const gold=n=>(Math.max(0,n)||0).toLocaleString('ko-KR')+' G';
@@ -73,30 +73,34 @@ function Game({room,user,onCall}){
   const landed=room.tiles[me?.position??0];
   const shown=room.tiles[selected??me?.position??0]||room.tiles[0];
   const owner=room.players.find(p=>p.userId===shown.ownerId);
+  const landedOwner=room.players.find(p=>p.userId===landed?.ownerId);
+  const shownToll=['property','tourist'].includes(shown.type)?landingToll(room,shown):0;
+  const recentMoney=(room.moneyEvents||[]).filter(x=>clock-x.at<8000).slice(0,4);
   const animationLocked=moving||clock<(room.visualLockUntil||0);
   const canAct=myTurn&&room.phase==='decide'&&!room.pending&&!animationLocked;
   const canBuild=canAct&&landed?.type==='property'&&(landed.ownerId==null||landed.ownerId===user.id)&&landed.level<4&&!me?.builtThisLanding;
   const canTourist=canAct&&landed?.type==='tourist'&&landed.ownerId==null;
-  const canAcquire=canAct&&landed?.ownerId!=null&&landed.ownerId!==user.id&&landed.level<4&&(me?.freeAcquire||0)>0;
+  const canPaidAcquire=canAct&&landed?.type==='property'&&landed?.ownerId!=null&&landed.ownerId!==user.id&&landed.level<4;
+  const canAcquire=canPaidAcquire&&(me?.freeAcquire||0)>0;
   const remaining=Math.max(0,Math.ceil((((room.phase==='roll'?room.rollDeadline:room.decisionDeadline)||0)-clock)/1000));
   const round=Math.min(25,Math.floor((room.turnCount||0)/room.players.length)+1);
-  const rollReady=myTurn&&room.phase==='roll'&&!moving;
+  const rollReady=myTurn&&room.phase==='roll'&&!animationLocked;
   const landingKey=`${room.id}:${room.lastRoll?.at||0}:${me?.position??0}`;
   useEffect(()=>{
     if(!myTurn){setDialog(null);return;}
-    if((canBuild||canTourist||canAcquire)&&dismissedLanding!==landingKey)setDialog('build');
-    else if(!(canBuild||canTourist||canAcquire))setDialog(x=>x==='build'?null:x);
-  },[myTurn,canBuild,canTourist,canAcquire,landingKey,dismissedLanding]);
+    if((canBuild||canTourist||canPaidAcquire)&&dismissedLanding!==landingKey)setDialog('build');
+    else if(!(canBuild||canTourist||canPaidAcquire))setDialog(x=>x==='build'?null:x);
+  },[myTurn,canBuild,canTourist,canPaidAcquire,landingKey,dismissedLanding]);
   const buildAt=q=>{
     const cost=buildPrice(landed,q);
     return <button key={q} className="marble-dialog-primary" disabled={!canBuild||(q>1&&((me?.laps||0)<3||landed.ownerId==null))||landed.level+q>4||(me?.gold||0)<cost} onClick={()=>onCall('game:build',{tileId:landed.id,quantity:q}).then(ok=>{if(ok)setDialog(null)})}>
-      {q===1?'🏠 건물 1단계 건설':'🏙 건물 3단계 건설'} <strong>{gold(cost)}</strong>
+      {q===1?'🏠 1단계 건설':q===2?'🏘 2단계 건설':'🏙 3단계 건설'} <strong>{gold(cost)}</strong>
     </button>;
   };
   const hasPending=myTurn&&!!room.pending&&!animationLocked;
   const isWinner=room.status==='finished';
-  const openBuild=myTurn&&(canBuild||canTourist||canAcquire);
-  const showDialog=isWinner||hasPending||dialog==='cards'||dialog==='menu'||dialog==='region'||(dialog==='build'&&openBuild);
+  const openBuild=myTurn&&(canBuild||canTourist||canPaidAcquire);
+  const showDialog=isWinner||hasPending||dialog==='cards'||dialog==='menu'||dialog==='money'||dialog==='region'||(dialog==='build'&&openBuild);
   const closeDialog=()=>{if(dialog==='build')setDismissedLanding(landingKey);setDialog(null)};
   const hudSlots=room.players.length===2?['top-left','bottom-right']:room.players.length===3?['top-left','bottom-left','bottom-right']:['top-left','bottom-left','bottom-right','top-right'];
   return <div className="marble-arena marble-arena--classic">
@@ -105,6 +109,7 @@ function Game({room,user,onCall}){
       <div className="marble-classic-room">방 <b>{room.id}</b> · {room.players.length}명 · {round}/25 라운드</div>
       <div className="marble-classic-prize">🏆 승리 보상 최대 ×4 <span>· 판돈 500만 G</span></div>
       <div className="marble-classic-actions">
+        <button type="button" onClick={()=>setDialog('money')}>💰 거래 내역</button>
         <button type="button" onClick={()=>setDialog('cards')}>🎴 아이템</button>
         <button type="button" onClick={()=>setDialog('menu')}>⚙ 메뉴</button>
       </div>
@@ -112,21 +117,26 @@ function Game({room,user,onCall}){
     <main className="marble-classic-stage">
       <Board25D
         tiles={room.tiles} players={room.players} selected={selected??me?.position??0}
-        onSelect={setSelected} lastRoll={room.lastRoll} onMotionChange={setMoving}
+        onSelect={id=>{setSelected(id);setDialog('region')}} lastRoll={room.lastRoll} lastTravel={room.lastTravel} onMotionChange={setMoving}
         onRoll={()=>onCall('game:roll')} rollReady={rollReady} remaining={remaining}
         onEnd={()=>onCall('game:end')} canEnd={canAct}
         activeName={active?.nickname||''} myTurn={myTurn}
       />
       <div className="marble-classic-players">
-        {room.players.map((p,i)=><div key={p.userId} className={`marble-corner-player marble-corner-player--${hudSlots[i]||'top-left'} ${active?.userId===p.userId?'is-active':''} ${p.userId===user.id?'is-me':''} ${p.bankrupt?'is-out':''}`}>
+        {room.players.map((p,i)=><div key={p.userId} style={{'--owner-color':pawnColor[p.character]||'#ffd86f'}} className={`marble-corner-player marble-corner-player--${hudSlots[i]||'top-left'} ${active?.userId===p.userId?'is-active':''} ${p.userId===user.id?'is-me':''} ${p.bankrupt?'is-out':''}`}>
           <div className="marble-corner-avatar" style={{'--player-color':pawnColor[p.character]||'#ffd86f'}}><PlayerFace character={p.character}/></div>
           <div className="marble-corner-stats">
-            <div className="marble-corner-name">{p.nickname} {p.userId===user.id?'· 나':''}</div>
+            <div className="marble-corner-name"><span className="marble-corner-id">P{i+1}</span> {p.nickname} {p.userId===user.id?'· 나':''}</div>
             <div className="marble-corner-money">{gold(p.gold)}</div>
             <div className="marble-corner-small">{p.bankrupt?'파산':active?.userId===p.userId?'🎲 현재 턴':`${p.laps||0}바퀴 완주`}</div>
           </div>
         </div>)}
       </div>
+      {recentMoney.length>0&&<div className="marble-money-feed" aria-live="polite">
+        {recentMoney.map(e=><div key={e.id} className={'marble-money-event '+(e.amount<0?'is-minus':'is-plus')}>
+          <strong>{e.nickname}</strong><b>{e.amount>0?'+':'−'}{gold(Math.abs(e.amount))}</b><span>{e.reason}</span>
+        </div>)}
+      </div>}
       <div className="marble-classic-lowerbar">
         <button type="button" onClick={()=>setDialog('region')}>📍 {shown.name} <span>{shown.type==='property'?BUILD_LEVELS[shown.level]||'빈 땅':TYPE_LABEL[shown.type]||shown.type}</span></button>
         <span>{room.logs?.[0]?.text||'주사위를 굴려 게임을 시작하세요.'}</span>
@@ -140,14 +150,35 @@ function Game({room,user,onCall}){
         hasPending?<><div className="marble-popup-kicker">🎴 CHANCE / EVENT</div><PendingChoice room={room} onCall={onCall}/></>:
         dialog==='build'&&openBuild?<><div className="marble-popup-kicker">🏗 CONSTRUCTION</div><h2>{landed.name}</h2><p>현재 게임머니 <b>{gold(me?.gold||0)}</b></p>
           <div className="marble-popup-actions">
-            {canBuild&&<><p>{landed.ownerId==null?'첫 건설 시 자동으로 이 지역의 소유자가 됩니다.':`현재 ${BUILD_LEVELS[landed.level]} · 추가 건설 선택`}</p>{buildAt(1)}{(me?.laps||0)>=3&&landed.ownerId!=null&&buildAt(3)}</>}
+            {canBuild&&<><p>{landed.ownerId==null?'첫 건설 시 자동으로 이 지역의 소유자가 됩니다.':`현재 ${BUILD_LEVELS[landed.level]} · 추가 건설 선택`}</p><p>1바퀴 완주: 2단계 · 3바퀴 완주: 3단계 건설 가능</p>{buildAt(1)}{(me?.laps||0)>=1&&landed.level+2<=4&&buildAt(2)}{(me?.laps||0)>=3&&landed.level+3<=4&&buildAt(3)}</>}
             {canTourist&&<button className="marble-dialog-primary" disabled={(me?.gold||0)<landed.price} onClick={()=>onCall('game:buy').then(ok=>{if(ok)setDialog(null)})}>★ 관광지 확보 <strong>{gold(landed.price)}</strong></button>}
-            {canAcquire&&<button className="marble-dialog-primary" onClick={()=>onCall('game:acquire').then(ok=>{if(ok)setDialog(null)})}>✨ 무료 인수권 사용</button>}
+            {canPaidAcquire&&<div className="marble-acquire-info">
+              <h3>🏷 ${landedOwner?.nickname||'상대'}님의 지역 인수</h3>
+              <p>도착 통행료 <b>{gold(landingToll(room,landed))}</b> · 현재 {BUILD_LEVELS[landed.level]}</p>
+              <p>인수하면 기존 건물과 소유권이 그대로 넘어옵니다. 랜드마크는 인수 불가.</p>
+              <button className="marble-dialog-primary" disabled={(me?.gold||0)<takeoverPrice(landed)} onClick={()=>onCall('game:acquire:paid').then(ok=>{if(ok)setDialog(null)})}>💰 유료 인수 <strong>{gold(takeoverPrice(landed))}</strong></button>
+              {canAcquire&&<button className="marble-dialog-primary" onClick={()=>onCall('game:acquire').then(ok=>{if(ok)setDialog(null)})}>✨ 무료 인수권 사용</button>}
+            </div>}
           </div>
           <button className="marble-popup-dismiss" onClick={()=>onCall('game:end').then(ok=>{if(ok){setDismissedLanding(landingKey);setDialog(null);}})}>건너뛰기 · 지금 턴 종료</button>
         </>:
         dialog==='cards'?<><div className="marble-popup-kicker">🎴 INVENTORY</div><h2>보유 아이템</h2><p>🪽 수호천사 {me?.guardian||0}장 · 🔓 탈옥권 {me?.escapeTickets||0}장 · ✨ 무료 인수권 {me?.freeAcquire||0}장</p><button className="marble-dialog-primary" disabled={!myTurn||!(me?.guardian>0)||animationLocked||!!room.pending} onClick={()=>onCall('game:card',{card:'guardian'}).then(ok=>{if(ok)setDialog(null)})}>수호천사 보호막 사용</button><button className="marble-popup-dismiss" onClick={closeDialog}>닫기</button></>:
-        dialog==='region'?<><div className="marble-popup-kicker">📍 REGION INFO · #{shown.id}</div><h2>{shown.name}</h2><p>{TYPE_LABEL[shown.type]||shown.type} · {shown.ownerId!=null?'소유 중':'미소유'}</p>{['property','tourist'].includes(shown.type)&&<p>소유자: <b>{owner?.nickname||'없음'}</b> · 단계: <b>{shown.type==='tourist'?'관광지':BUILD_LEVELS[shown.level]}</b></p>}<button className="marble-popup-dismiss" onClick={closeDialog}>확인</button></>:
+        dialog==='region'?<><div className="marble-popup-kicker">📍 REGION INFO · #{shown.id}</div><h2>{shown.name}</h2>
+          <p>{TYPE_LABEL[shown.type]||shown.type} · {shown.ownerId!=null?'소유 중':'미소유'}</p>
+          {['property','tourist'].includes(shown.type)&&<div className="marble-region-details">
+            <p>소유자: <b style={{color:owner?(pawnColor[owner.character]||'#ffe9a7'):undefined}}>{owner?.nickname||'없음'}</b> {owner?'· '+('P'+(room.players.findIndex(p=>p.userId===owner.userId)+1)):''}</p>
+            <p>건물 단계: <b>{shown.type==='tourist'?'관광지':BUILD_LEVELS[shown.level]}</b></p>
+            <p>이 칸을 밟으면 내는 통행료: <b>{shown.ownerId!=null?gold(shownToll):'0 G (미소유)'}</b></p>
+            {shown.type==='property'&&shown.ownerId!=null&&shown.level<4&&<p>유료 인수 가격: <b>{gold(takeoverPrice(shown))}</b> · 해당 칸 방문 시 인수 가능</p>}
+            {shown.level===4&&<p>🏛 랜드마크는 인수할 수 없습니다.</p>}
+          </div>}
+          <button className="marble-popup-dismiss" onClick={closeDialog}>확인</button></>:
+        dialog==='money'?<><div className="marble-popup-kicker">💰 GAME MONEY</div><h2>게임머니 거래 내역</h2>
+          <div className="marble-money-history">{(room.moneyEvents||[]).length===0?<p>아직 거래가 없습니다.</p>:
+            room.moneyEvents.slice(0,30).map(e=><div className="marble-money-history-item" key={e.id}>
+              <b>{e.nickname}</b> <strong className={e.amount<0?'is-minus':'is-plus'}>{e.amount>0?'+':'−'}{gold(Math.abs(e.amount))}</strong><small>{e.reason}</small>
+            </div>)}</div>
+          <button className="marble-popup-dismiss" onClick={closeDialog}>닫기</button></>:
         <><div className="marble-popup-kicker">⚙ GAME MENU</div><h2>게임 안내</h2><p>41칸 · 스타트 통과 +100,000 G · 건물 1단계 건설 시 소유권 획득 · 더블이면 추가 주사위</p><p>방 코드: <b>{room.id}</b></p><button className="marble-popup-dismiss" onClick={closeDialog}>게임으로 돌아가기</button></>}
       </div>
     </div>}
