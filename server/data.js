@@ -2,12 +2,12 @@
 export const START_GOLD = 1_000_000;
 export const ACCOUNT_START_WALLET = 5_000_000;
 export const MATCH_STAKE = 5_000_000;
-export const START_BONUS = 200_000; // Provisional rule until the owner chooses a value.
+export const START_BONUS = 100_000; // Provisional rule until the owner chooses a value.
 export const MAX_ROUNDS = 25; // Full rounds, provisional.
 export const BUILD_LEVELS = ['빈 땅', '소도시', '마을', '국가', '랜드마크'];
 export const GROUPS = [
   [1,2,4],[6,7,8],[10,11,12],[14,15,16],
-  [19,20,21],[24,25,26],[28,29,30],[33,34,35]
+  [19,20,21],[24,25,26],[28,29,30],[33,34,35],[37,38,39,40]
 ];
 export const TOURIST_IDS = [5,17,22,31];
 const NAMES = [
@@ -16,14 +16,15 @@ const NAMES = [
   '디트로이트','플로리다','독도','올림픽 개최','망고 하이닉스','망고 삼성전자',
   '망고 샌디스크','망고네집','찬스카드','노보로시스크','이라크','헤자즈',
   '공항','뉴욕에 온 나','니게니게 (프랑스)','잠깐 피라미드좀 짓고 (이집트)',
-  '지하실','찬스카드','곰돌이왕국','서리곰마을','스텔라이브','국세청'
+  '지하실','찬스카드','곰돌이왕국','서리곰마을','스텔라이브','국세청',
+  '푸른항구','유리도시','별빛마을','황금섬'
 ];
 export const TILES = NAMES.map((name,id) => {
   const type = id === 0 ? 'start' : id === 9 ? 'jail' : id === 3 ? 'minigame'
     : id === 18 ? 'olympics' : id === 27 ? 'airport' : id === 36 ? 'tax'
     : [13,23,32].includes(id) ? 'chance' : TOURIST_IDS.includes(id) ? 'tourist' : 'property';
   const group = GROUPS.findIndex(a=>a.includes(id));
-  const price = type === 'tourist' ? 750_000 : type === 'property' ? 300_000+Math.max(group,0)*75_000 : 0;
+  const price = type === 'tourist' ? 120_000 : type === 'property' ? 300_000+Math.max(group,0)*75_000 : 0;
   return {id,name,type,group,price,toll:Math.floor(price*0.10)};
 });
 export const CHARACTERS = [
