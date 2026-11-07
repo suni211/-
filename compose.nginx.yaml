@@ -1,0 +1,8 @@
+# For a Compute Engine VM that already runs host Nginx on ports 80/443.
+# Usage: docker compose -f compose.yaml -f compose.nginx.yaml --env-file .env up -d --build
+services:
+  app:
+    ports:
+      - "127.0.0.1:3001:3000"
+  proxy:
+    profiles: ["optional-caddy"]
