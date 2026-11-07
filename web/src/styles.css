@@ -269,3 +269,26 @@
  .marble-classic-stage .dice-face--5{transform:rotateX(90deg) translateZ(28px)}
  .marble-classic-stage .dice-face--6{transform:rotateX(-90deg) translateZ(28px)}
 }
+
+
+/* SHARED EDGE 41 CELL BOARD ALIGNMENT */
+.classic-board-svg{position:absolute;inset:0;display:block;width:100%;height:100%;z-index:12;pointer-events:none;overflow:visible}
+.classic-svg-cell{pointer-events:visiblePainted;cursor:pointer;outline:none}
+.classic-svg-cell polygon{pointer-events:visiblePainted;transition:filter .12s}
+.classic-svg-cell:hover polygon:first-of-type,.classic-svg-cell:focus-visible polygon:first-of-type{filter:brightness(1.13);stroke:#fff0a4;stroke-width:5}
+.classic-svg-cell.is-selected polygon:first-of-type{filter:drop-shadow(0 0 6px #ffdd59);stroke:#ffdd59}
+.classic-cell-number{font-family:system-ui,'Noto Sans KR',sans-serif;fill:#1e2533;font-size:14px;font-weight:950;pointer-events:none}
+.classic-cell-icon{font-family:system-ui,'Noto Sans KR',sans-serif;font-size:25px;pointer-events:none}
+.classic-cell-name{font-family:system-ui,'Noto Sans KR',sans-serif;fill:#24242d;font-size:18px;letter-spacing:-.05em;font-weight:1000;paint-order:stroke;stroke:#fcf8e8;stroke-width:2px;stroke-linejoin:round;pointer-events:none}
+.marble-classic-stage .marble-board-base{z-index:1}
+.marble-classic-stage .marble-board-plaza{z-index:3;left:17.2%;right:17.2%;top:19.3%;bottom:19.3%;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);padding:4% 10%;overflow:hidden;pointer-events:none}
+.marble-classic-stage .marble-board-plaza::after{inset:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);border:0;box-shadow:inset 0 0 28px #09090fa8;pointer-events:none}
+.marble-classic-stage .marble-board-plaza .marble-center-roll-wrap{pointer-events:auto}
+.marble-classic-stage .marble-board-plaza button{pointer-events:auto}
+.marble-classic-stage .marble-pawn{z-index:20;transition:left .13s linear,top .13s linear}
+.marble-classic-stage .marble-deck{left:15%;top:46%;transform:scale(.75) rotate(-13deg);opacity:.94}
+.marble-turn-end{font-size:12px;font-weight:1000;white-space:nowrap;color:#fff7de;background:linear-gradient(#80563b,#583b2f);border:2px solid #d1a46c;border-radius:10px;padding:7px 16px;box-shadow:0 4px 8px #0008;cursor:pointer}
+.marble-turn-end:hover{background:#9c673b}
+.marble-turn-end:focus-visible{outline:3px solid #ffe29e}
+@media(max-width:1300px){.classic-cell-name{font-size:16px}.classic-cell-icon{font-size:22px}.classic-cell-number{font-size:12px}}
+@media(max-width:800px){.classic-cell-name{font-size:15px}.classic-cell-icon{font-size:20px}.classic-cell-number{font-size:12px}.marble-classic-stage .marble-board-plaza{padding:5% 8%}.marble-classic-stage .marble-deck{display:none}}
