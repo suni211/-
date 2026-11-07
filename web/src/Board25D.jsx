@@ -75,6 +75,7 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
       <div className="marble-board-plaza">
         <div className="marble-center-title">✦ 탓승마블</div>
         <div className="marble-center-subtitle">41칸 · 건설 · 독점</div>
+        <div className="marble-deck" aria-hidden="true"><div className="marble-deck-card">?</div><span>CHANCE</span></div>
         <div className={'world-dice '+(motion?'is-rolling':'')} aria-live="polite">
           <DiceCube value={faces[0]} index={0} rolling={motion}/>
           <DiceCube value={faces[1]} index={1} rolling={motion}/>
@@ -92,7 +93,7 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
         const accent=isProperty?COLOR_GROUPS[Math.max(0,tile.group)%COLOR_GROUPS.length]:tile.type==='tourist'?'#ffe078':'#a8b9d8';
         return <button key={tile.id} type="button" className={'marble-tile marble-tile--'+tile.type+' marble-tile--'+pos.side+(selected===tile.id?' is-selected':'')+(owned?' is-owned':'')} style={{left:`${pos.x}%`,top:`${pos.y}%`,'--tile-accent':accent,'--tile-rot':(['bottom','top'].includes(pos.side)?'45deg':'-45deg')}} onClick={()=>onSelect(tile.id)} title={`${tile.id}번 ${tile.name}${owned?' · 소유 중':''}`}>
           <span className="marble-tile-top"><span>{String(tile.id).padStart(2,'0')}</span><span>{isProperty?'도시':tile.type==='tourist'?'관광지':'스페셜'}</span></span>
-          <span className="marble-tile-icon">{tile.level>0?(tile.level===4?LANDMARK_VARIANTS[(tile.id*7+Math.max(0,tile.group))%LANDMARK_VARIANTS.length]:STAGE_VARIANTS[tile.level][(tile.id+Math.max(0,tile.group)*3)%8]):KIND_ICONS[tile.type]||'◆'}</span>
+          <span className="marble-tile-icon">{tile.level>0?(tile.level===4?LANDMARK_VARIANTS[(tile.id*7+Math.max(0,tile.group))%LANDMARK_VARIANTS.length]:STAGE_VARIANTS[tile.level][(tile.id+Math.max(0,tile.group)*3)%8]):KIND_ICONS[tile.type]||''}</span>
           <span className="marble-tile-name">{tile.name}</span>
           {owned&&<span className="marble-tile-owner">{tile.type==='tourist'?'★ 소유':'LV '+tile.level}</span>}
         </button>
