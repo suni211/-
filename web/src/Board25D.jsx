@@ -113,11 +113,12 @@ function TileCell({tile,geom,selected,onSelect,players}){
   </g>;
 }
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=null,onMotionChange=()=>{},onRoll=()=>{},onEnd=()=>{},canEnd=false,rollReady=false,remaining=0,activeName='',myTurn=false}){
+function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=null,onMotionChange=()=>{},lastTravel=null,onRoll=()=>{},onEnd=()=>{},canEnd=false,rollReady=false,remaining=0,activeName='',myTurn=false}){
   const [visual,setVisual]=useState({});
   const [motion,setMotion]=useState(false);
+  const [traveling,setTraveling]=useState(false);
   const [faces,setFaces]=useState([1,1]);
-  const runId=useRef(null),onMotion=useRef(onMotionChange);
+  const runId=useRef(null),travelId=useRef(null),onMotion=useRef(onMotionChange);
   useEffect(()=>{onMotion.current=onMotionChange},[onMotionChange]);
   useEffect(()=>{
     if(!lastRoll?.at||lastRoll.at===runId.current)return;
@@ -146,6 +147,32 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
     animate();
     return ()=>{cancelled=true;clearInterval(tick);onMotion.current(false)};
   },[lastRoll?.at]);
+  useEffect(()=>{
+    if(!lastTravel?.at||lastTravel.at===travelId.current)return;
+    travelId.current=lastTravel.at;
+    if(!Number.isInteger(lastTravel.from)||Date.now()-lastTravel.at>7000)return;
+    let cancelled=false;
+    const steps=Math.max(0,Math.min(BOARD_LENGTH*2,Number(lastTravel.steps)||0));
+    const tick=Math.max(35,Math.min(105,Math.round(3200/Math.max(steps,1))));
+    async function travel(){
+      setVisual(v=>({...v,[lastTravel.userId]:lastTravel.from}));
+      setTraveling(true);
+      onMotion.current(true);
+      for(let n=1;n<=steps;n++){
+        await wait(tick);
+        if(cancelled)return;
+        setVisual(v=>({...v,[lastTravel.userId]:(lastTravel.from+n)%BOARD_LENGTH}));
+      }
+      await wait(350);
+      if(!cancelled){
+        setVisual(v=>{const out={...v};delete out[lastTravel.userId];return out;});
+        setTraveling(false);
+        onMotion.current(false);
+      }
+    }
+    travel();
+    return ()=>{cancelled=true;setTraveling(false);onMotion.current(false);};
+  },[lastTravel?.at]);
   const occupied=players.map(p=>({p,index:visual[p.userId]??p.position}));
   const currentPlayer=players.find(p=>p.userId===lastRoll?.userId);
   return <div className="marble-scroller">
@@ -178,7 +205,7 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
       </svg>
       {occupied.map(({p,index})=>{
         const pos=positionFor(index),same=occupied.filter(x=>x.index===index),slot=same.findIndex(x=>x.p.userId===p.userId);
-        return <div key={p.userId} className={'marble-pawn '+(motion&&p.userId===lastRoll?.userId?'marble-pawn--moving':'')} style={{left:`calc(${pos.x}% + ${slot%2*13-6}px)`,top:`calc(${pos.y}% + ${Math.floor(slot/2)*10-15}px)`,'--pawn':PLAYER_COLORS[p.character]||PLAYER_COLORS.tatsung}} title={`${p.nickname} · ${index}번`}>
+        return <div key={p.userId} className={'marble-pawn '+(motion&&p.userId===lastRoll?.userId?'marble-pawn--moving':'')+(traveling&&p.userId===lastTravel?.userId?' marble-pawn--traveling':'')} style={{left:`calc(${pos.x}% + ${slot%2*13-6}px)`,top:`calc(${pos.y}% + ${Math.floor(slot/2)*10-15}px)`,'--pawn':PLAYER_COLORS[p.character]||PLAYER_COLORS.tatsung}} title={`${p.nickname} · ${index}번`}>
           <div className="pawn-face"><span className="pawn-eyes">• •</span><span className="pawn-mouth">◡</span></div>
           <div className="pawn-label">{p.nickname}</div>
         </div>;
