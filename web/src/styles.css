@@ -170,3 +170,102 @@
 .marble-classic-dialog .marble-popup-dismiss{margin-top:12px}
 @media(max-width:1000px){.marble-corner-player{width:170px;min-height:68px}.marble-corner-avatar{width:40px;height:42px}.marble-corner-money{font-size:13px}.marble-classic-prize span{display:none}.marble-classic-stage .marble-tile-name{font-size:8px}}
 @media(max-width:740px){.marble-classic-top{gap:5px;padding:0 6px}.marble-classic-brand{font-size:13px}.marble-classic-room{font-size:9px}.marble-classic-prize{display:none}.marble-classic-actions button{font-size:9px;padding:6px}.marble-classic-stage{overflow:auto}.marble-classic-stage .marble-scroller{overflow:auto}.marble-classic-stage .marble-map{width:790px;min-width:790px;height:600px;min-height:600px}.marble-corner-player{width:135px;min-height:58px;padding:3px}.marble-corner-avatar{width:33px;height:34px}.marble-corner-name{font-size:10px}.marble-corner-money{font-size:10px}.marble-classic-lowerbar>span{display:none}}
+
+
+/* CLASSIC BOARD READABILITY REVISION 2026-11-07 */
+/* Framed, beveled board rather than a flat polygon with unreadable diagonal slivers. */
+.marble-arena--classic{min-height:0;background:#272220}
+.marble-classic-top{height:52px;min-height:52px;background:linear-gradient(180deg,#62503e 0%,#302725 100%);border-bottom:3px solid #b99664;padding:0 19px}
+.marble-classic-brand{font-size:20px;letter-spacing:-.035em}
+.marble-classic-prize{font-size:13px;background:linear-gradient(180deg,#554331,#332d28);border-color:#b79966}
+.marble-classic-stage{background:radial-gradient(ellipse at center,#554639 0,#26272a 82%),repeating-linear-gradient(4deg,#3c342b 0 3px,#302b29 3px 7px);background-blend-mode:normal}
+.marble-classic-stage .marble-map{background:radial-gradient(ellipse at 50% 50%,#44393e,#27252a 85%)}
+.marble-classic-stage .marble-board-base{inset:1.7% 2.7%;opacity:1;
+  background:linear-gradient(160deg,#baa274 0%,#715638 10%,#292429 16%,#312b2e 78%,#aa8554 90%,#e0c08c 100%);
+  filter:drop-shadow(0 11px 10px #000a);box-shadow:inset 0 0 25px #0008}
+.marble-classic-stage .marble-board-plaza{left:11.2%;right:11.2%;top:12%;bottom:12%;
+  background:radial-gradient(ellipse at 52% 40%,#514047 0%,#372d34 57%,#221d26 100%);
+  box-shadow:inset 0 0 80px #09090f9c}
+.marble-classic-stage .marble-board-plaza::after{inset:5.5%;border:3px solid #8c6e52;opacity:.75}
+.marble-classic-stage .marble-tile{
+  width:5.45%;height:7.35%;padding:4px 4px 3px;border:2px solid #b7a895;border-top-width:4px;
+  border-radius:5px;box-shadow:inset 0 2px #fff9,0 5px 0 #5d4b47,0 9px 8px #0008;
+  background:linear-gradient(170deg,#f8f5ec,#d0d5dc);
+  justify-content:flex-start;gap:3px;overflow:visible
+}
+.marble-classic-stage .marble-tile--property{
+  border-top:5px solid var(--tile-accent);
+  background:linear-gradient(168deg,#f5f4e8 0%,#f2f1ec 44%,var(--tile-accent) 46%,var(--tile-accent) 100%)
+}
+.marble-classic-stage .marble-tile-name{
+  font-size:clamp(9px,.78vw,12px);line-height:1.12;max-height:none;overflow:hidden;min-height:13px;
+  color:#181c22;text-shadow:0 1px #ffffff9e;font-weight:1000;word-break:keep-all;
+  width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical
+}
+.marble-classic-stage .marble-tile-top{font-size:8px;line-height:1;align-items:center;font-weight:1000;letter-spacing:.02em}
+.marble-classic-stage .marble-tile-icon{font-size:clamp(13px,1.1vw,20px);line-height:1.05;height:20px}
+.marble-classic-stage .marble-tile--property:not(.is-owned) .marble-tile-icon{display:none}
+.marble-classic-stage .marble-tile--property:not(.is-owned) .marble-tile-name{margin-top:3px}
+.marble-classic-stage .marble-tile--tourist,.marble-classic-stage .marble-tile--chance,.marble-classic-stage .marble-tile--start,
+.marble-classic-stage .marble-tile--airport,.marble-classic-stage .marble-tile--jail{border-top-width:5px}
+.marble-classic-stage .marble-tile.is-owned{box-shadow:inset 0 2px #fffc,0 4px 0 #62413e,0 6px 13px #0009;border-color:#eed59a}
+.marble-classic-stage .marble-tile-owner{bottom:-9px;font-size:8px;padding:3px 5px;white-space:nowrap}
+.marble-classic-stage .marble-center-title{font-size:clamp(20px,2.4vw,36px);font-weight:1000;color:#eadab5;text-shadow:0 3px 3px #090a0be3}
+.marble-classic-stage .marble-center-subtitle{font-size:11px;color:#c9b6aa;letter-spacing:.17em;margin:2px 0 11px}
+.marble-classic-stage .world-dice{gap:22px;margin:11px 0 9px}
+.marble-classic-stage .die-perspective{width:91px;height:91px}
+.marble-classic-stage .dice-cube{width:68px;height:68px}
+.marble-classic-stage .dice-face--1{transform:translateZ(34px)}
+.marble-classic-stage .dice-face--2{transform:rotateY(90deg) translateZ(34px)}
+.marble-classic-stage .dice-face--3{transform:rotateY(180deg) translateZ(34px)}
+.marble-classic-stage .dice-face--4{transform:rotateY(-90deg) translateZ(34px)}
+.marble-classic-stage .dice-face--5{transform:rotateX(90deg) translateZ(34px)}
+.marble-classic-stage .dice-face--6{transform:rotateX(-90deg) translateZ(34px)}
+.marble-classic-stage .dice-pip{width:12px;height:12px}
+.marble-classic-stage .marble-center-message{font-size:14px;font-weight:900;padding:10px 26px;border-color:#8e7970;background:#2c2428e8}
+.marble-classic-stage .marble-roll-main{width:112px;height:83px;border-width:6px;font-size:26px;box-shadow:0 8px 0 #4a352b,0 13px 16px #050405bd}
+.marble-classic-stage .marble-center-roll-wrap{gap:9px;margin-top:10px}
+.marble-classic-stage .marble-center-roll-wrap>span{font-size:11px;font-weight:800;color:#ffe7c4}
+.marble-deck{position:absolute;left:28%;top:49%;z-index:4;display:flex;flex-direction:column;align-items:center;transform:rotate(-13deg);pointer-events:none;gap:3px}
+.marble-deck-card{width:70px;height:92px;border-radius:7px;border:3px solid #f4d99f;color:#bb8947;font-size:62px;line-height:83px;font-family:Georgia,serif;text-align:center;
+  background:repeating-linear-gradient(40deg,#ffeda6 0 6px,#ebce73 6px 11px);box-shadow:5px 4px 0 #a78a4d,9px 7px 0 #66523b,0 14px 19px #000b;text-shadow:1px 2px #fff9}
+.marble-deck>span{font-size:10px;font-weight:1000;letter-spacing:.1em;color:#e9c988;text-shadow:0 2px 5px #000}
+.marble-corner-player{width:252px;min-height:90px;gap:11px;background:linear-gradient(180deg,#47372eea,#2c2827f2);border:2px solid #ad946d;padding:9px 12px;box-shadow:0 6px 16px #000a}
+.marble-corner-player--top-left{top:8px;left:12px}
+.marble-corner-player--top-right{top:8px;right:12px}
+.marble-corner-player--bottom-left{bottom:44px;left:12px}
+.marble-corner-player--bottom-right{bottom:44px;right:12px}
+.marble-corner-avatar{width:64px;height:64px;border:2px solid var(--player-color);border-radius:7px}
+.marble-corner-avatar .pawn-face{transform:scale(1.12) rotate(-9deg)}
+.marble-corner-name{font-size:14px;max-width:150px;color:#f6e8d5}
+.marble-corner-money{font-size:20px;color:#ffe3a3}
+.marble-corner-small{font-size:11px;color:#d8c5b2}
+.marble-classic-lowerbar{height:39px;background:#2d2625ed;border-top:2px solid #977855}
+.marble-classic-lowerbar>span{font-size:12px}
+.marble-classic-lowerbar button{padding:7px 12px;font-size:12px}
+@media(max-width:1100px){
+ .marble-corner-player{width:195px;min-height:70px;padding:6px 8px;gap:7px}
+ .marble-corner-avatar{width:47px;height:48px}
+ .marble-corner-name{font-size:12px}.marble-corner-money{font-size:15px}
+ .marble-classic-stage .marble-tile{height:6.6%;padding:2px 2px 1px}
+ .marble-classic-stage .marble-tile-name{font-size:9px}
+ .marble-deck{left:25%;transform:scale(.7) rotate(-13deg)}
+}
+@media(max-width:740px){
+ .marble-classic-stage .marble-map{width:790px;min-width:790px;height:600px;min-height:600px}
+ .marble-classic-stage .marble-tile{width:5.35%;height:6.7%}
+ .marble-classic-stage .marble-tile-name{font-size:8px}
+ .marble-deck{display:none}
+ .marble-corner-player{width:135px;min-height:58px;padding:3px}
+ .marble-corner-avatar{width:33px;height:34px}
+ .marble-corner-name{font-size:10px}.marble-corner-money{font-size:10px}
+ .marble-classic-stage .marble-roll-main{width:85px;height:70px;font-size:21px}
+ .marble-classic-stage .die-perspective{width:72px;height:72px}
+ .marble-classic-stage .dice-cube{width:56px;height:56px}
+ .marble-classic-stage .dice-face--1{transform:translateZ(28px)}
+ .marble-classic-stage .dice-face--2{transform:rotateY(90deg) translateZ(28px)}
+ .marble-classic-stage .dice-face--3{transform:rotateY(180deg) translateZ(28px)}
+ .marble-classic-stage .dice-face--4{transform:rotateY(-90deg) translateZ(28px)}
+ .marble-classic-stage .dice-face--5{transform:rotateX(90deg) translateZ(28px)}
+ .marble-classic-stage .dice-face--6{transform:rotateX(-90deg) translateZ(28px)}
+}
