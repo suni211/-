@@ -39,7 +39,7 @@ test('cannot start with one player or duplicate character',()=>{
 
 test('account wager and in-game money are deliberately separate',()=>{
   assert.equal(ACCOUNT_START_WALLET,5_000_000);
-  assert.equal(MATCH_STAKE,5_000_000);
+  assert.equal(MATCH_STAKE,100_000);
   assert.equal(START_GOLD,1_000_000);
 });
 test('three normal buildings maximum and landmark requires a separate upgrade',()=>{
