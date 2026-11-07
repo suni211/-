@@ -1,26 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {TILES, CHANCE_CARDS, START_GOLD, ACCOUNT_START_WALLET, MATCH_STAKE, GROUPS, TOURIST_IDS} from './data.js';
+import {TILES, CHANCE_CARDS, START_GOLD, START_BONUS, ACCOUNT_START_WALLET, MATCH_STAKE, GROUPS, TOURIST_IDS} from './data.js';
 import {createRoom, joinRoom, startGame, roll, buy, build, buildCost, endTurn, resolve as resolveEffect, useHeldCard} from './engine.js';
 const a={id:'a',nickname:'A',username:'a'};const b={id:'b',nickname:'B',username:'b'};
 function setup(){const r=createRoom(a,{name:'test'});joinRoom(r,b);r.players[1].ready=true;startGame(r,'a');return r;}
-test('board exactly 37 positions, names, tourism and chance',()=>{
-  assert.equal(TILES.length,37);assert.equal(TILES[0].name,'스타트');assert.equal(TILES[36].name,'국세청');
-  assert.deepEqual(TOURIST_IDS,[5,17,22,31]);assert.equal(CHANCE_CARDS.length,14);assert.equal(GROUPS.length,8);
+test('board exactly 41 positions, names, tourism and chance',()=>{
+  assert.equal(TILES.length,41);assert.equal(TILES[0].name,'스타트');assert.equal(TILES[36].name,'국세청');assert.equal(TILES[40].name,'황금섬');
+  assert.deepEqual(TOURIST_IDS,[5,17,22,31]);assert.equal(CHANCE_CARDS.length,14);assert.equal(GROUPS.length,9);
 });
 test('2-4 players, start gold and server-authoritative dice',()=>{
   const r=setup();assert.equal(r.players.length,2);assert.equal(r.players[0].gold,START_GOLD);
   roll(r,'a',()=>0);assert.deepEqual(r.lastRoll.dice,[1,1]);assert.equal(r.players[0].position,2);
   assert.equal(r.phase,'decide');assert.throws(()=>roll(r,'a',()=>0));
 });
-test('purchase, build, end turn and turn protection',()=>{
-  const r=setup();roll(r,'a',()=>0);const price=r.tiles[2].price;buy(r,'a');assert.equal(r.tiles[2].ownerId,'a');
-  assert.equal(r.tiles[2].level,0);assert.ok(r.players[0].gold<START_GOLD);
+test('first construction automatically claims the land and charges only the building cost',()=>{
+  const r=setup();roll(r,'a',()=>0);
+  const t=r.tiles[2],cost=buildCost(t,1);
+  assert.throws(()=>buy(r,'a'),/관광지만/);
   assert.throws(()=>build(r,'a',2,3),/3바퀴/);
-  build(r,'a',2);assert.equal(r.tiles[2].level,1);
+  build(r,'a',2);assert.equal(t.ownerId,'a');assert.equal(t.level,1);
+  assert.equal(r.players[0].gold,START_GOLD-cost);
   assert.throws(()=>build(r,'a',2),/이미 건설/);
-  assert.throws(()=>roll(r,'b',()=>0));
-  endTurn(r,'a');assert.equal(r.turnIndex,1);const beforeToll=r.players[0].gold;roll(r,'b',()=>0);assert.equal(r.players[1].position,2);
+  r.players[0].extraRoll=0;endTurn(r,'a');assert.equal(r.turnIndex,1);
+  const beforeToll=r.players[0].gold;roll(r,'b',()=>0);
+  assert.equal(r.players[1].position,2);
   assert.ok(r.players[1].gold<START_GOLD);assert.ok(r.players[0].gold>beforeToll);
 });
 test('odd-even minigame is server-determined',()=>{
@@ -40,10 +43,11 @@ test('account wager and in-game money are deliberately separate',()=>{
   assert.equal(START_GOLD,1_000_000);
 });
 test('building restriction opens at three completed laps',()=>{
-  const r=setup();roll(r,'a',()=>0);buy(r,'a');
+  const r=setup();roll(r,'a',()=>0);build(r,'a',2);
+  r.players[0].builtThisLanding=false;
   r.players[0].laps=3;
   r.players[0].gold=3_000_000;
-  build(r,'a',2,3);assert.equal(r.tiles[2].level,3);
+  build(r,'a',2,3);assert.equal(r.tiles[2].level,4);
   assert.equal(r.players[0].builtThisLanding,true);
 });
 test('guardian chance can be stored and activated later',()=>{
@@ -72,20 +76,36 @@ test('tourism monopoly ends game immediately at 4 tourist properties',()=>{
 });
 
 test('free build chance allows the first building on owned empty land',()=>{
-  const r=setup();roll(r,'a',()=>0);buy(r,'a');
+  const r=setup();roll(r,'a',()=>0);build(r,'a',2);
   r.pending={type:'free_build',options:[2]};
   resolveEffect(r,'a',{tileId:2});
-  assert.equal(r.tiles[2].level,1);
+  assert.equal(r.tiles[2].level,2);
 });
-test('free acquire ticket is not consumed when buying unowned land',()=>{
+test('free acquire ticket is not consumed on a new construction',()=>{
   const r=setup();roll(r,'a',()=>0);
   r.players[0].freeAcquire=1;
-  buy(r,'a');assert.equal(r.players[0].freeAcquire,1);
-  assert.equal(r.players[0].gold, START_GOLD-r.tiles[2].price);
+  build(r,'a',2);assert.equal(r.players[0].freeAcquire,1);
+  assert.equal(r.players[0].gold, START_GOLD-buildCost(r.tiles[2],1));
 });
 
 test('building price ladder is affordable and matches the displayed amounts',()=>{
   const tile={price:300_000};
-  assert.equal(buildCost(tile,1),135_000);
-  assert.equal(buildCost(tile,4),297_000);
+  assert.equal(buildCost(tile,1),30_000);
+  assert.equal(buildCost(tile,4),66_000);
+});
+
+test('START crossing awards exactly 100k on the 41-space board',()=>{
+  const r=setup();r.players[0].position=40;roll(r,'a',()=>0);
+  assert.equal(r.players[0].position,1);
+  assert.equal(START_BONUS,100_000);assert.equal(r.players[0].gold,1_100_000);
+  assert.equal(r.players[0].laps,1);
+});
+test('DOUBLE is synchronized and awards another roll to the same player',()=>{
+  const r=setup();roll(r,'a',()=>0);
+  assert.equal(r.lastRoll.double,true);assert.equal(r.players[0].extraRoll,1);
+  endTurn(r,'a');
+  assert.equal(r.turnIndex,0);assert.equal(r.phase,'roll');
+  let i=0;roll(r,'a',()=>[0,1][i++]);
+  assert.equal(r.lastRoll.double,false);
+  endTurn(r,'a');assert.equal(r.turnIndex,1);
 });
