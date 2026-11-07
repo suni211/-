@@ -162,7 +162,8 @@ export function build(room,userId,tileId,quantity=1){
   const p=assertTurn(room,userId);assertPhase(room,'decide');
   if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
   const t=tileAt(room,Number(tileId));
-  if(!t||t.id!==p.position||t.type!=='property'||(t.ownerId!=null&&t.ownerId!==userId)||t.level>=4)error('빈 땅 또는 본인 지역에서만 건설할 수 있습니다.');
+  if(!t||t.id!==p.position||t.type!=='property'||(t.ownerId!=null&&t.ownerId!==userId))error('빈 땅 또는 본인 지역에서만 건설할 수 있습니다.');
+  if(t.level>=4)error('랜드마크가 완성된 지역에는 추가 건설할 수 없습니다.');
   if(p.builtThisLanding)error('이 지역에서는 이미 건설했습니다. 다음 방문을 기다려주세요.');
   const q=Number(quantity);
   if(!Number.isInteger(q)||q<1||q>3)error('건설 수량이 올바르지 않습니다.');
