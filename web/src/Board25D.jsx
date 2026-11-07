@@ -21,7 +21,7 @@ export function positionFor(id){
   return {x:50+43*(u-v),y:50+44*(u+v-1),side};
 }
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-export const buildPrice=(tile,q)=>Array.from({length:q},(_,i)=>Math.round(tile.price*(.27+(tile.level+i+1)*.18))).reduce((a,b)=>a+b,0);
+export const buildPrice=(tile,q)=>Array.from({length:q},(_,i)=>Math.round(tile.price*(.06+(tile.level+i+1)*.04))).reduce((a,b)=>a+b,0);
 
 const PIP_CELLS={1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
 const FACE_ROTATIONS={1:[0,0],2:[0,-90],3:[0,-180],4:[0,90],5:[-90,0],6:[90,0]};
@@ -59,7 +59,7 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
       for(let n=1;n<=steps;n++){
         await wait(150);
         if(cancelled)return;
-        setVisual(v=>({...v,[userId]:(from+n)%37}));
+        setVisual(v=>({...v,[userId]:(from+n)%tiles.length}));
       }
       await wait(280);
       if(!cancelled){setVisual(v=>{const out={...v};delete out[userId];return out;});setMotion(false);onMotion.current(false);}
@@ -70,7 +70,7 @@ function Board25D({tiles=[],players=[],selected=null,onSelect=()=>{},lastRoll=nu
   const position=players.map(p=>({p,index:visual[p.userId]??p.position}));
   const currentPlayer=players.find(p=>p.userId===lastRoll?.userId);
   return <div className="marble-scroller">
-    <div className="marble-map" aria-label="탓승마블 37칸 게임 보드">
+    <div className="marble-map" aria-label="탓승마블 41칸 게임 보드">
       <div className="marble-board-base"/>
       <div className="marble-board-plaza">
         <div className="marble-center-title">✦ 탓승마블</div>
