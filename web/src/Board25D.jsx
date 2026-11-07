@@ -68,6 +68,8 @@ export const positionFor=id=>{
   return {x:g.pawn[0]*100/1600,y:g.pawn[1]*100/900,side:g.side};
 };
 export const buildPrice=(tile,q)=>Array.from({length:q},(_,i)=>Math.round(tile.price*(.06+(tile.level+i+1)*.04))).reduce((a,b)=>a+b,0);
+export const takeoverPrice=t=>Math.round(t.price*.12+Array.from({length:t.level},(_,i)=>Math.round(t.price*(.06+(i+1)*.04))).reduce((a,b)=>a+b,0)*2);
+export const landingToll=(room,t)=>Math.floor(t.toll*(t.type==='tourist'?3:2**t.level)*(room.olympics?.userId===t.ownerId?2:1));
 const PIP_CELLS={1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
 const FACE_ROTATIONS={1:[0,0],2:[0,-90],3:[0,-180],4:[0,90],5:[-90,0],6:[90,0]};
 function DiceCube({value=1,index=0,rolling=false}){
