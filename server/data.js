@@ -1,7 +1,8 @@
 // Canonical game content; edit region prices and balance here, not in the client.
 export const START_GOLD = 1_000_000;
 export const ACCOUNT_START_WALLET = 5_000_000;
-export const MATCH_STAKE = 5_000_000;
+// Wallet starts at 5M, but each match only reserves a small entry stake.
+export const MATCH_STAKE = 100_000;
 export const START_BONUS = 100_000; // Provisional rule until the owner chooses a value.
 export const MAX_ROUNDS = 25; // Full rounds, provisional.
 export const BUILD_LEVELS = ['빈 땅', '소도시', '마을', '국가', '랜드마크'];
