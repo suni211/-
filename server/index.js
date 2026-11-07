@@ -191,7 +191,7 @@ io.on('connection',socket=>{
     if(room.status==='playing'&&room.phase==='decide'&&!room.pending)endTurn(room,u.id);
   };
   const actions={
-    'game:roll':()=>roll(inRoom(),u.id),
+    'game:roll':()=>{const room=inRoom();enforceAnimationDone(room);roll(room,u.id);},
     'game:buy':()=>{const room=inRoom();enforceAnimationDone(room);buy(room,u.id);finishDecision(room);},
     'game:build':({tileId,quantity})=>{const room=inRoom();enforceAnimationDone(room);build(room,u.id,tileId,quantity);finishDecision(room);},
     'game:acquire':()=>{const room=inRoom();enforceAnimationDone(room);acquire(room,u.id);finishDecision(room);},
