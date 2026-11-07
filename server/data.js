@@ -1,5 +1,7 @@
 // Canonical game content; edit region prices and balance here, not in the client.
-export const START_GOLD = 5_000_000;
+export const START_GOLD = 1_000_000;
+export const ACCOUNT_START_WALLET = 5_000_000;
+export const MATCH_STAKE = 5_000_000;
 export const START_BONUS = 200_000; // Provisional rule until the owner chooses a value.
 export const MAX_ROUNDS = 25; // Full rounds, provisional.
 export const BUILD_LEVELS = ['빈 땅', '소도시', '마을', '국가', '랜드마크'];
@@ -33,17 +35,17 @@ export const CHARACTERS = [
 export const CHANCE_CARDS = [
   {id:'city_swap',name:'도시 바꾸기',description:'랜드마크를 제외한 내 도시와 상대 도시를 교환합니다.'},
   {id:'forced_sale',name:'도시 강제매각',description:'상대의 랜드마크가 아닌 도시를 은행에 강제 매각합니다.'},
-  {id:'guardian',name:'수호천사',description:'다음 통행료를 1회 방어합니다.'},
-  {id:'free_acquire',name:'인수 무료',description:'랜드마크가 아닌 상대 도시를 만났을 때 무료 인수가 가능합니다.'},
+  {id:'guardian',name:'수호천사',kind:'choice',description:'즉시 보호막을 켜거나 수호천사 카드를 보관합니다.'},
+  {id:'free_acquire',kind:'hold',name:'인수 무료',description:'랜드마크가 아닌 상대 도시를 만났을 때 무료 인수가 가능합니다.'},
   {id:'airport',name:'공항으로',description:'공항(27번)으로 이동합니다.'},
   {id:'jail',name:'감빵으로',description:'감옥(9번)으로 이동합니다.'},
-  {id:'escape',name:'감빵 탈옥권',description:'감옥에서 사용할 탈옥권을 얻습니다.'},
+  {id:'escape',kind:'hold',name:'감빵 탈옥권',description:'감옥에서 사용할 탈옥권을 얻습니다.'},
   {id:'tax',name:'국세청으로',description:'국세청(36번)으로 이동하여 세금을 냅니다.'},
   {id:'olympics',name:'올림픽 개최하러',description:'올림픽 개최 칸(18번)으로 이동합니다.'},
   {id:'start',name:'스타트지점으로',description:'스타트(0번)로 이동합니다.'},
   {id:'random_me_to_them',name:'아무한테 랜덤으로',description:'다른 플레이어가 있는 칸으로 순간이동합니다.'},
   {id:'random_them_to_me',name:'아무나 나한테 랜덤으로',description:'무작위 상대를 내 칸으로 불러옵니다.'},
-  {id:'extra_roll',name:'주사위 1번 더',description:'이번 턴에 주사위를 한 번 더 던집니다.'},
+  {id:'extra_roll',kind:'instant',name:'주사위 1번 더',description:'이번 턴에 주사위를 한 번 더 던집니다.'},
   {id:'free_build',name:'아무 곳이나 1개 건물 더짓기',description:'내 건물 하나를 무료로 한 단계 업그레이드합니다.'}
 ];
 export const WIN_MULTIPLIERS = {triple:2,bankruptcy:2.5,turn_end:1,tourist:4};

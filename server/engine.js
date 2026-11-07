@@ -38,6 +38,7 @@ const finish=(room,p,reason) => {
 const addGold=(room,p,amount) => {p.gold +=amount; if(p.gold<0){p.gold=0;p.bankrupt=true;room.tiles.forEach(t=>{if(t.ownerId===p.userId){t.ownerId=null;t.level=0;}});log(room,`${p.nickname}님 파산!`);}checkWinner(room);};
 const moveTo=(room,p,position,{passStart=false}={})=>{
   if(passStart && position<p.position){p.gold+=START_BONUS;log(room,`${p.nickname}님 스타트 통과 +${START_BONUS.toLocaleString()}G`);}
+  if(passStart && position<p.position)p.laps=(p.laps||0)+1;
   p.position=position;
 };
 const onLanding=(room,p,rand=sample)=>{
@@ -56,11 +57,12 @@ const onLanding=(room,p,rand=sample)=>{
     room.olympics={userId:p.userId,turnsLeft:8};log(room,`${p.nickname}님 올림픽 개최! 8턴 동안 소유 도시 통행료 2배`);
   }
   else if(t.type==='minigame')room.pending={type:'odd_even'};
+  else if(t.type==='airport')room.pending={type:'airport',options:room.tiles.filter(t=>t.id!==27).map(t=>t.id)};
   else if(t.type==='property'||t.type==='tourist'){
     if(t.ownerId && t.ownerId!==p.userId){
       const owner=room.players.find(q=>q.userId===t.ownerId);
       const toll=Math.floor(t.toll * (t.type==='tourist'?3:Math.pow(2,t.level)) * (room.olympics?.userId===t.ownerId ? 2:1));
-      if(p.guardian){p.guardian--;log(room,`${p.nickname}님 수호천사 사용 · 통행료 면제`);}
+      if(p.guardianActive){p.guardianActive--;log(room,`${p.nickname}님 수호천사 보호막 발동 · 통행료 면제`);}
       else if(owner && !owner.bankrupt){const paid=Math.min(p.gold,toll);owner.gold+=paid;log(room,`${p.nickname}님 → ${owner.nickname}님 통행료 ${paid.toLocaleString()}G`);addGold(room,p,-toll);}
     }
   }
@@ -68,24 +70,24 @@ const onLanding=(room,p,rand=sample)=>{
 const applyChance=(room,p,id,rand=sample)=>{
   switch(id){
     case 'city_swap': {
-      const own=room.tiles.filter(t=>t.ownerId===p.userId&&t.level<4);
-      const other=room.tiles.filter(t=>t.ownerId&&t.ownerId!==p.userId&&t.level<4);
+      const own=room.tiles.filter(t=>t.type==='property'&&t.ownerId===p.userId&&t.level<4);
+      const other=room.tiles.filter(t=>t.type==='property'&&t.ownerId&&t.ownerId!==p.userId&&t.level<4);
       if(own.length&&other.length)room.pending={type:id,own:own.map(t=>t.id),other:other.map(t=>t.id)};
       else log(room,'교환 가능한 도시가 없어 효과가 사라졌습니다.');break;
     }
     case 'forced_sale':{
-      const options=room.tiles.filter(t=>t.ownerId&&t.ownerId!==p.userId&&t.level<4).map(t=>t.id);
+      const options=room.tiles.filter(t=>t.type==='property'&&t.ownerId&&t.ownerId!==p.userId&&t.level<4).map(t=>t.id);
       if(options.length)room.pending={type:id,options};else log(room,'매각할 수 있는 도시가 없습니다.');break;
     }
     case 'free_build':{
-      const options=room.tiles.filter(t=>t.ownerId===p.userId&&t.level>0&&t.level<4&&t.type==='property').map(t=>t.id);
+      const options=room.tiles.filter(t=>t.ownerId===p.userId&&t.level<4&&t.type==='property').map(t=>t.id);
       if(options.length)room.pending={type:id,options};else log(room,'업그레이드할 건물이 없습니다.');break;
     }
-    case 'guardian':p.guardian++;break;
+    case 'guardian':room.pending={type:'guardian_choice'};break;
     case 'free_acquire':p.freeAcquire++;break;
     case 'escape':p.escapeTickets++;break;
     case 'extra_roll':p.extraRoll++;break;
-    case 'airport':moveTo(room,p,27);break;
+    case 'airport':moveTo(room,p,27);room.pending={type:'airport',options:room.tiles.filter(t=>t.id!==27).map(t=>t.id)};break;
     case 'jail':moveTo(room,p,9);p.jailTurns=2;break;
     case 'tax':moveTo(room,p,36);addGold(room,p,-Math.floor(p.gold*.10));break;
     case 'olympics':moveTo(room,p,18);room.olympics={userId:p.userId,turnsLeft:8};break;
@@ -101,9 +103,9 @@ const applyChance=(room,p,id,rand=sample)=>{
 };
 const key = () => Array.from({length:6},()=> 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[sample(32)]).join('');
 export function createRoom(owner,{name='새 게임방',isPrivate=false}={}){
-  return {id:key(),name:String(name).slice(0,28)||'새 게임방',isPrivate:!!isPrivate,hostId:owner.id,status:'waiting',phase:'waiting',turnIndex:0,turnCount:0,createdAt:now(),updatedAt:now(),lastRoll:null,lastChance:null,pending:null,winner:null,olympics:null,tiles:TILES.map(t=>({...t,ownerId:null,level:0})),logs:[],players:[newPlayer(owner)]};
+  return {id:key(),name:String(name).slice(0,28)||'새 게임방',isPrivate:!!isPrivate,hostId:owner.id,status:'waiting',phase:'waiting',turnIndex:0,turnCount:0,createdAt:now(),updatedAt:now(),lastRoll:null,lastChance:null,pending:null,winner:null,olympics:null,visualLockUntil:0,decisionDeadline:0,rollDeadline:0,tiles:TILES.map(t=>({...t,ownerId:null,level:0})),logs:[],players:[newPlayer(owner)]};
 }
-export function newPlayer(user){return {userId:user.id,nickname:user.nickname,username:user.username,character:'tatsung',connected:true,ready:false,position:0,gold:START_GOLD,bankrupt:false,jailTurns:0,escapeTickets:0,guardian:0,freeAcquire:0,extraRoll:0};}
+export function newPlayer(user){return {userId:user.id,nickname:user.nickname,username:user.username,character:'tatsung',connected:true,ready:false,position:0,gold:START_GOLD,bankrupt:false,laps:0,builtThisLanding:false,jailTurns:0,escapeTickets:0,guardian:0,guardianActive:0,freeAcquire:0,extraRoll:0};}
 export function joinRoom(room,user){
   if(room.status!=='waiting')error('이미 진행 중인 게임방입니다.');
   if(room.players.some(p=>p.userId===user.id))return;
@@ -117,12 +119,16 @@ export function leaveRoom(room,userId){const i=room.players.findIndex(p=>p.userI
 export function startGame(room,userId){if(room.status!=='waiting'||room.hostId!==userId)error('방장만 게임을 시작할 수 있습니다.');
   if(room.players.length<2||room.players.length>4)error('게임 시작은 2~4명이 필요합니다.');
   if(room.players.some(p=>p.userId!==userId&&!p.ready))error('모든 참가자가 준비해야 합니다.');
-  room.status='playing';room.phase='roll';room.turnIndex=0;room.turnCount=0;room.pending=null;
+  room.status='playing';room.phase='roll';room.turnIndex=0;room.turnCount=0;room.pending=null;room.rollDeadline=now()+30_000;
+  for(const p of room.players){p.gold=START_GOLD;p.laps=0;p.builtThisLanding=false;p.position=0;}
   log(room,'게임 시작! 첫 플레이어가 주사위를 굴리세요.');
 }
 export function roll(room,userId,rand=sample){const p=assertTurn(room,userId);assertPhase(room,'roll');room.pending=null;room.lastChance=null;
-  if(p.jailTurns>0){if(p.escapeTickets>0){p.escapeTickets--;p.jailTurns=0;log(room,`${p.nickname}님 탈옥권 사용`);}else{p.jailTurns--;room.phase='end';log(room,`${p.nickname}님 감옥 대기 · ${p.jailTurns}턴 남음`);return;}}
-  const dice=[rollDie(rand),rollDie(rand)];room.lastRoll={dice,userId,at:now()};moveTo(room,p,(p.position+dice[0]+dice[1])%room.tiles.length,{passStart:true});
+  if(p.jailTurns>0){if(p.escapeTickets>0){p.escapeTickets--;p.jailTurns=0;log(room,`${p.nickname}님 탈옥권 사용`);}else{p.jailTurns--;room.phase='decide';room.decisionDeadline=now()+1500;log(room,`${p.nickname}님 감옥 대기 · ${p.jailTurns}턴 남음`);return;}}
+  const dice=[rollDie(rand),rollDie(rand)];const from=p.position,to=(from+dice[0]+dice[1])%room.tiles.length;
+  room.lastRoll={dice,userId,at:now(),from,to,steps:dice[0]+dice[1]};
+  room.visualLockUntil=now()+3000;room.decisionDeadline=now()+15500;
+  p.builtThisLanding=false;moveTo(room,p,to,{passStart:true});
   room.phase='decide';log(room,`${p.nickname}님 ${dice[0]} + ${dice[1]} = ${dice[0]+dice[1]}칸 이동 → ${room.tiles[p.position].name}`);
   onLanding(room,p,rand);
   if(room.status==='playing' && p.bankrupt){room.turnCount++;room.turnIndex=nextActive(room,room.turnIndex);room.phase='roll';room.pending=null;}
@@ -130,21 +136,53 @@ export function roll(room,userId,rand=sample){const p=assertTurn(room,userId);as
 }
 export function buy(room,userId){const p=assertTurn(room,userId);assertPhase(room,'decide');if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
   const t=tileAt(room,p.position);if(!['property','tourist'].includes(t.type)||t.ownerId)error('구매할 수 없는 지역입니다.');
-  const price=p.freeAcquire>0?0:t.price;if(p.gold<price)error('골드가 부족합니다.');
-  p.gold-=price;if(price===0)p.freeAcquire--;t.ownerId=p.userId;t.level=t.type==='tourist'?0:1;
-  if(t.level===1){const cost=buildCost(t,1);if(p.gold>=cost)p.gold-=cost;else t.level=0;}
-  log(room,`${p.nickname}님 ${t.name} 매입${t.level===1?' · 소도시 건설':''}`);checkWinner(room);
+  const price=t.price;if(p.gold<price)error('골드가 부족합니다.');
+  p.gold-=price;t.ownerId=p.userId;t.level=0;
+  log(room,`${p.nickname}님 ${t.name} 매입 (건설은 별도)`);checkWinner(room);
 }
-export function build(room,userId,tileId){const p=assertTurn(room,userId);assertPhase(room,'decide');if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
-  const t=tileAt(room,Number(tileId));if(!t||t.id!==p.position||t.type!=='property'||t.ownerId!==userId||t.level>=4)error('내가 도착한 도시만 건설할 수 있습니다.');
-  const cost=buildCost(t,t.level+1);if(p.gold<cost)error('골드가 부족합니다.');p.gold-=cost;t.level++;log(room,`${p.nickname}님 ${t.name} → ${BUILD_LEVELS[t.level]}`);
+export function build(room,userId,tileId,quantity=1){
+  const p=assertTurn(room,userId);assertPhase(room,'decide');
+  if(room.pending)error('카드/미니게임을 먼저 완료하세요.');
+  const t=tileAt(room,Number(tileId));
+  if(!t||t.id!==p.position||t.type!=='property'||t.ownerId!==userId||t.level>=4)error('내가 도착한 도시만 건설할 수 있습니다.');
+  if(p.builtThisLanding)error('이 지역에서는 이미 건설했습니다. 다음 방문을 기다려주세요.');
+  const q=Number(quantity);
+  if(!Number.isInteger(q)||q<1||q>3)error('건설 수량이 올바르지 않습니다.');
+  if(q>1&&p.laps<3)error('스타트를 3바퀴 돌아야 한 번에 여러 건물을 지을 수 있습니다.');
+  if(t.level+q>4)error('랜드마크 이상 건설할 수 없습니다.');
+  const total=Array.from({length:q},(_,i)=>buildCost(t,t.level+i+1)).reduce((a,b)=>a+b,0);
+  if(p.gold<total)error('게임머니가 부족합니다.');
+  p.gold-=total;t.level+=q;p.builtThisLanding=true;
+  log(room,`${p.nickname}님 ${t.name} → ${BUILD_LEVELS[t.level]} (${q}단계)`);
 }
 export function acquire(room,userId){const p=assertTurn(room,userId);assertPhase(room,'decide');if(room.pending)error('미해결 카드가 있습니다.');
   const t=tileAt(room,p.position);if(!t?.ownerId||t.ownerId===userId||t.level===4||p.freeAcquire<=0)error('무료 인수를 할 수 없습니다.');
   p.freeAcquire--;t.ownerId=userId;log(room,`${p.nickname}님 무료 인수! ${t.name}`);checkWinner(room);
 }
 export function resolve(room,userId,option={},rand=sample){const p=assertTurn(room,userId);assertPhase(room,'decide');const pending=room.pending;if(!pending)error('선택 대기 중인 효과가 없습니다.');
+  // Validate first: malformed client choices must not silently discard a pending card.
+  if(pending.type==='guardian_choice' && !['hold','use'].includes(option.value))error('보관 또는 즉시 사용을 선택하세요.');
+  if(pending.type==='odd_even' && !['odd','even'].includes(option.value))error('홀 또는 짝을 선택하세요.');
+  if(['airport','forced_sale','free_build'].includes(pending.type)){
+    if(!pending.options.includes(Number(option.tileId)))error('올바른 목적지/도시를 선택하세요.');
+  }
+  if(pending.type==='city_swap' && (!pending.own.includes(Number(option.ownId)) || !pending.other.includes(Number(option.otherId))))error('교환할 도시를 올바르게 선택하세요.');
+  // Clear only after input validation; airport landings may create a second pending action.
+  room.pending=null;
   switch(pending.type){
+    case 'guardian_choice':{
+      if(!['hold','use'].includes(option.value))error('보관 또는 즉시 사용을 선택하세요.');
+      if(option.value==='hold')p.guardian++;else p.guardianActive++;
+      log(room,`${p.nickname}님 수호천사 ${option.value==='hold'?'보관':'즉시 사용 (보호막 활성화)'}`);break;
+    }
+    case 'airport':{
+      const dest=Number(option.tileId);
+      if(!pending.options.includes(dest))error('올바른 공항 목적지를 선택하세요.');
+      moveTo(room,p,dest);
+      log(room,`${p.nickname}님 공항 비행 → ${room.tiles[dest].name}`);
+      onLanding(room,p,rand);
+      break;
+    }
     case 'odd_even': {
       if(!['odd','even'].includes(option.value))error('홀 또는 짝을 선택하세요.');
       const die=rollDie(rand);const won=(die%2===0?'even':'odd')===option.value;addGold(room,p,won?300_000:-150_000);
@@ -164,22 +202,29 @@ export function resolve(room,userId,option={},rand=sample){const p=assertTurn(ro
     }
     case 'free_build':{
       const id=Number(option.tileId);if(!pending.options.includes(id))error('선택할 수 없는 도시입니다.');
-      const t=tileAt(room,id);if(t.ownerId!==p.userId||t.level>=4||t.level<1)error('건설할 수 없습니다.');
+      const t=tileAt(room,id);if(t.ownerId!==p.userId||t.level>=4)error('건설할 수 없습니다.');
       t.level++;log(room,`${t.name} 무료 업그레이드 → ${BUILD_LEVELS[t.level]}`);break;
     }
     default:error('알 수 없는 선택입니다.');
   }
-  room.pending=null;checkWinner(room);
+  checkWinner(room);
   if(room.status==='playing'&&p.bankrupt){room.turnCount++;room.turnIndex=nextActive(room,room.turnIndex);room.phase='roll';}
 }
 
+export function useHeldCard(room,userId,card){
+  const p=assertTurn(room,userId);
+  if(card!=='guardian'||p.guardian<=0)error('보유 중인 수호천사 카드가 없습니다.');
+  if(!['roll','decide'].includes(room.phase)||room.pending)error('지금은 카드를 사용할 수 없습니다.');
+  p.guardian--;p.guardianActive++;
+  log(room,`${p.nickname}님 수호천사 카드 사용 · 다음 통행료 보호`);
+}
 export function endTurn(room,userId){const p=assertTurn(room,userId);if(room.phase==='roll')error('주사위를 먼저 굴리세요.');
   if(room.pending)error('카드/미니게임 효과를 먼저 처리하세요.');
-  if(p.extraRoll>0){p.extraRoll--;room.phase='roll';log(room,`${p.nickname}님 추가 주사위!`);return;}
+  if(p.extraRoll>0){p.extraRoll--;room.phase='roll';room.rollDeadline=now()+30_000;log(room,`${p.nickname}님 추가 주사위!`);return;}
   room.turnCount++;
   if(room.olympics){room.olympics.turnsLeft--;if(room.olympics.turnsLeft<=0)room.olympics=null;}
   if(room.turnCount>=MAX_ROUNDS*room.players.length){const alive=room.players.filter(q=>!q.bankrupt);alive.sort((a,b)=>netWorth(room,b)-netWorth(room,a));return finish(room,alive[0]||p,'turn_end');}
-  room.turnIndex=nextActive(room,room.turnIndex);room.phase='roll';room.lastChance=null;room.pending=null;
+  room.turnIndex=nextActive(room,room.turnIndex);room.phase='roll';room.rollDeadline=now()+30_000;room.lastChance=null;room.pending=null;
 }
 export function publicState(room){return {
   ...room,players:room.players.map(p=>({...p,username:undefined})),

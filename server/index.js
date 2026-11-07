@@ -10,8 +10,8 @@ import {randomUUID} from 'node:crypto';
 import {existsSync} from 'node:fs';
 import {join, resolve as resolvePath} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createRoom, joinRoom, leaveRoom, startGame, roll, buy, build, acquire, resolve as resolveEffect, endTurn, lobbySummary, publicState} from './engine.js';
-import {CHARACTERS} from './data.js';
+import {createRoom, joinRoom, leaveRoom, startGame, roll, buy, build, acquire, useHeldCard, resolve as resolveEffect, endTurn, lobbySummary, publicState} from './engine.js';
+import {CHARACTERS, ACCOUNT_START_WALLET, MATCH_STAKE} from './data.js';
 
 const PORT=Number(process.env.PORT||3000);
 const JWT_SECRET=process.env.JWT_SECRET;
@@ -33,6 +33,41 @@ async function initDb(){for(let i=0;i<30;i++)try{
   return;
 }catch(e){if(i===29)throw e;console.error('MySQL connection pending:',e.message);await sleep(2000);}}
 await initDb();
+try {await pool.query(`ALTER TABLE accounts ADD COLUMN wallet_g BIGINT NOT NULL DEFAULT ${ACCOUNT_START_WALLET}`);}catch(e){if(e.code!=='ER_DUP_FIELDNAME')throw e;}
+await pool.query(`CREATE TABLE IF NOT EXISTS match_wagers (
+ match_id VARCHAR(40) NOT NULL, user_id VARCHAR(36) NOT NULL, stake BIGINT NOT NULL,
+ state ENUM('reserved','settled','refunded') NOT NULL DEFAULT 'reserved',
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(match_id,user_id), INDEX(state)
+) CHARACTER SET utf8mb4`);
+// Games are in process memory. On a restart, refund any unfinished wager to avoid losing funds.
+async function refundInterruptedWagers(){
+ const [r]=await pool.query("SELECT DISTINCT match_id FROM match_wagers WHERE state='reserved'");
+ for(const {match_id} of r){
+   const conn=await pool.getConnection();
+   try{await conn.beginTransaction();
+     const [rows]=await conn.query("SELECT user_id,stake FROM match_wagers WHERE match_id=? AND state='reserved' FOR UPDATE",[match_id]);
+     for(const w of rows)await conn.query('UPDATE accounts SET wallet_g=wallet_g+? WHERE id=?',[w.stake,w.user_id]);
+     await conn.query("UPDATE match_wagers SET state='refunded' WHERE match_id=? AND state='reserved'",[match_id]);
+     await conn.commit();
+   }catch(e){await conn.rollback();throw e;}finally{conn.release();}
+ }
+}
+await refundInterruptedWagers();
+async function reserveWagers(room){
+ const conn=await pool.getConnection();
+ try{await conn.beginTransaction();
+  const users=[...room.players].sort((a,b)=>a.userId.localeCompare(b.userId));
+  for(const p of users){
+   const [rows]=await conn.query('SELECT wallet_g FROM accounts WHERE id=? FOR UPDATE',[p.userId]);
+   if(!rows.length||Number(rows[0].wallet_g)<MATCH_STAKE)throw new Error(`${p.nickname}님의 계정 판돈이 부족합니다. (필요: 5,000,000 G)`);
+   await conn.query('UPDATE accounts SET wallet_g=wallet_g-? WHERE id=?',[MATCH_STAKE,p.userId]);
+   await conn.query('INSERT INTO match_wagers(match_id,user_id,stake) VALUES (?,?,?)',[room.id,p.userId,MATCH_STAKE]);
+  }
+  await conn.commit();room.wagerLocked=true;
+ }catch(e){await conn.rollback();throw e;}finally{conn.release();}
+}
+
 const app=express();app.set('trust proxy',1);app.disable('x-powered-by');
 app.use(express.json({limit:'16kb'}));app.use(cookieParser());
 app.use((req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');next();});
@@ -42,8 +77,8 @@ function rateLimit(req,res,next){const key=req.ip||'unknown', now=Date.now(), v=
   active.push(now);attempts.set(key,active);next();
 }
 setInterval(()=>{const t=Date.now();for(const [k,v] of attempts)if(v.every(n=>t-n>15*60*1000))attempts.delete(k);},60_000).unref();
-const publicUser=u=>({id:u.id,username:u.username,nickname:u.nickname,wins:u.wins,games:u.games});
-async function loadUser(id){const [rows]=await pool.query('SELECT id,username,nickname,wins,games FROM accounts WHERE id=?',[id]);return rows[0]||null;}
+const publicUser=u=>({id:u.id,username:u.username,nickname:u.nickname,wins:u.wins,games:u.games,wallet:Number(u.wallet_g||0)});
+async function loadUser(id){const [rows]=await pool.query('SELECT id,username,nickname,wins,games,wallet_g FROM accounts WHERE id=?',[id]);return rows[0]||null;}
 function authToken(req){return req.cookies?.tatsung_token || null;}
 function tokenUser(token){try{const d=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});return d.sub;}catch{return null;}}
 const setCookie=(res,u,req)=>{const token=jwt.sign({sub:u.id},JWT_SECRET,{expiresIn:'7d',algorithm:'HS256'});
@@ -78,8 +113,23 @@ const rooms=new Map(),userRoom=new Map();
 const summary=()=>[...rooms.values()].filter(r=>!r.isPrivate&&r.status!=='finished').map(lobbySummary);
 const notifyLobby=()=>io.emit('lobby:rooms',summary());
 async function persistWinner(room){
-  if(room.status!=='finished'||room.statsWritten)return;room.statsWritten=true;
-  for(const p of room.players){await pool.query('UPDATE accounts SET games=games+1, wins=wins+? WHERE id=?',[(p.userId===room.winner?.userId)?1:0,p.userId]).catch(e=>console.error('stat write failed:',e));}
+ if(room.status!=='finished'||room.statsWritten||room.statsWriting)return;
+ room.statsWriting=true;const conn=await pool.getConnection();
+ try{
+  await conn.beginTransaction();
+  const [stakes]=await conn.query("SELECT user_id,stake FROM match_wagers WHERE match_id=? AND state='reserved' FOR UPDATE",[room.id]);
+  if(stakes.length){
+   for(const p of room.players){
+    await conn.query('UPDATE accounts SET games=games+1,wins=wins+? WHERE id=?',[(p.userId===room.winner?.userId)?1:0,p.userId]);
+   }
+   const amount=Math.round(MATCH_STAKE * Number(room.winner?.multiplier||1));
+   await conn.query('UPDATE accounts SET wallet_g=wallet_g+? WHERE id=?',[amount,room.winner.userId]);
+   await conn.query("UPDATE match_wagers SET state='settled' WHERE match_id=? AND state='reserved'",[room.id]);
+   room.winner.payout=amount;
+  }
+  await conn.commit();room.statsWritten=true;
+  for(const p of room.players){const u=await loadUser(p.userId);if(u)io.to('user:'+p.userId).emit('account:updated',publicUser(u));}
+ }catch(e){await conn.rollback();console.error('Match settlement failed:',e);}finally{room.statsWriting=false;conn.release();}
 }
 function publish(room){room.updatedAt=Date.now();io.to('room:'+room.id).emit('room:state',publicState(room));if(room.status==='finished')void persistWinner(room);notifyLobby();}
 io.use(async(socket,next)=>{try{
@@ -126,14 +176,24 @@ io.on('connection',socket=>{
     const room=inRoom();if(room.status!=='waiting')throw Error('이미 게임이 시작됐습니다.');
     const p=room.players.find(p=>p.userId===u.id);p.ready=!p.ready;publish(room);
   }));
-  socket.on('room:start',guarded(()=>{const room=inRoom();startGame(room,u.id);publish(room);}));
+  socket.on('room:start',guarded(async()=>{
+    const room=inRoom();
+    if(room.starting)throw new Error('게임을 시작하고 있습니다.');
+    if(room.status!=='waiting'||room.hostId!==u.id||room.players.length<2||room.players.some(p=>p.userId!==u.id&&!p.ready))throw new Error('게임 시작 조건을 확인하세요.');
+    room.starting=true;
+    try{await reserveWagers(room);startGame(room,u.id);publish(room);
+      for(const p of room.players){const user=await loadUser(p.userId);if(user)io.to('user:'+p.userId).emit('account:updated',publicUser(user));}
+    }finally{room.starting=false;}
+  }));
+  const enforceAnimationDone=room=>{if(Date.now()<(room.visualLockUntil||0))throw new Error('주사위와 말이 이동 중입니다.');};
   const actions={
     'game:roll':()=>roll(inRoom(),u.id),
-    'game:buy':()=>buy(inRoom(),u.id),
-    'game:build':({tileId})=>build(inRoom(),u.id,tileId),
-    'game:acquire':()=>acquire(inRoom(),u.id),
-    'game:resolve':(value)=>resolveEffect(inRoom(),u.id,value),
-    'game:end':()=>endTurn(inRoom(),u.id)
+    'game:buy':()=>{const room=inRoom();enforceAnimationDone(room);buy(room,u.id);},
+    'game:build':({tileId,quantity})=>{const room=inRoom();enforceAnimationDone(room);build(room,u.id,tileId,quantity);},
+    'game:acquire':()=>{const room=inRoom();enforceAnimationDone(room);acquire(room,u.id);},
+    'game:card':({card})=>{const room=inRoom();enforceAnimationDone(room);useHeldCard(room,u.id,card);},
+    'game:resolve':(value)=>{const room=inRoom();enforceAnimationDone(room);resolveEffect(room,u.id,value);if(room.pending)room.decisionDeadline=Date.now()+20000;},
+    'game:end':()=>{throw new Error('턴은 자동 종료됩니다.');}
   };
   for(const [event,fn] of Object.entries(actions))socket.on(event,guarded(data=>{fn(data);publish(inRoom());}));
   socket.on('disconnect',()=>{
@@ -143,20 +203,30 @@ io.on('connection',socket=>{
     if(!stillConnected){p.connected=false;p.disconnectedAt=Date.now();publish(room);}
   });
 });
-// Recover stalled turns after disconnect (single VM instance, in-memory match state).
+// Server-authoritative automatic turns and pending-choice timeouts.
 setInterval(()=>{
+  const t=Date.now();
   for(const room of rooms.values()){
     if(room.status!=='playing')continue;
-    const p=room.players[room.turnIndex];if(!p||p.connected||!p.disconnectedAt||Date.now()-p.disconnectedAt<90_000)continue;
+    const p=room.players[room.turnIndex];if(!p)continue;
     try{
-      if(room.phase==='roll')roll(room,p.userId);
-      if(room.pending){const v=room.pending.type==='odd_even'?{value:'odd'}:room.pending.type==='city_swap'?{ownId:room.pending.own[0],otherId:room.pending.other[0]}:{tileId:room.pending.options[0]};resolveEffect(room,p.userId,v);}
-      if(room.status==='playing'&&room.phase!=='roll')endTurn(room,p.userId);
-      p.disconnectedAt=Date.now();publish(room);
-    }catch(e){console.error('Disconnected player skip failed:',e.message);}
+      if(room.phase==='roll' && t>room.rollDeadline){roll(room,p.userId);publish(room);continue;}
+      if(room.phase==='decide' && t>room.visualLockUntil){
+        if(room.pending && t>room.decisionDeadline){
+          const q=room.pending;
+          const choice=q.type==='guardian_choice'?{value:'hold'}:q.type==='odd_even'?{value:'odd'}:
+            q.type==='city_swap'?{ownId:q.own[0],otherId:q.other[0]}:{tileId:q.options?.[0]??0};
+          resolveEffect(room,p.userId,choice);room.decisionDeadline=t+20000;publish(room);continue;
+        }
+        if(!room.pending && t>room.decisionDeadline){endTurn(room,p.userId);publish(room);continue;}
+      }
+    }catch(e){console.error('Auto turn failed:',e.message);}
   }
-  for(const [id,room] of rooms)if(Date.now()-room.updatedAt>12*3600_000){rooms.delete(id);for(const p of room.players)if(userRoom.get(p.userId)===id)userRoom.delete(p.userId);}
-},5000).unref();
+  for(const [id,room] of rooms){
+    if(room.status==='finished'&&!room.statsWritten)void persistWinner(room);
+    if(t-room.updatedAt>12*3600_000){rooms.delete(id);for(const p of room.players)if(userRoom.get(p.userId)===id)userRoom.delete(p.userId);}
+  }
+},500).unref();
 const clientDist=resolvePath(fileURLToPath(new URL('../web/dist/',import.meta.url)));
 if(existsSync(clientDist)){
   app.use(express.static(clientDist,{maxAge:'30m',index:false}));
